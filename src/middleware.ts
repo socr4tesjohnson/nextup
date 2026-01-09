@@ -22,5 +22,6 @@ export const config = {
     "/groups/:path*",
     "/me/:path*",
     "/settings/:path*",
+    "/search/:path*",
   ],
 }
