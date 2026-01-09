@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
 
     if (existingEntry) {
       return NextResponse.json(
-        { error: "Game already in your list. Use PATCH to update." },
+        { error: "This game is already in your list. You can update it from My Lists." },
         { status: 400 }
       )
     }

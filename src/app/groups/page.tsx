@@ -276,7 +276,7 @@ export default function GroupsPage() {
                       id="inviteCode"
                       placeholder="ABCD1234"
                       value={inviteCode}
-                      onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                      onChange={(e) => setInviteCode(e.target.value)}
                       required
                       disabled={joining}
                       className="font-mono uppercase"

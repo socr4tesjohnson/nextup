@@ -36,6 +36,46 @@ interface Group {
   isOwner: boolean
 }
 
+interface GameEntry {
+  id: string
+  status: string
+  game: {
+    id: string
+    name: string
+    coverUrl: string | null
+    firstReleaseDate: string | null
+  }
+  user: {
+    id: string
+    name: string | null
+    email: string
+    image: string | null
+  }
+  createdAt: string
+  updatedAt: string
+}
+
+interface WishlistItem {
+  game: {
+    id: string
+    name: string
+    coverUrl: string | null
+  }
+  users: Array<{
+    id: string
+    name: string | null
+    email: string
+    image: string | null
+  }>
+  count: number
+}
+
+interface DashboardData {
+  nowPlaying: GameEntry[]
+  mostWanted: WishlistItem[]
+  recentlyAdded: GameEntry[]
+}
+
 export default function GroupDetailPage() {
   const { data: session, status } = useSession()
   const params = useParams()
@@ -43,23 +83,34 @@ export default function GroupDetailPage() {
   const groupId = params.id as string
 
   const [group, setGroup] = useState<Group | null>(null)
+  const [dashboard, setDashboard] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
 
   useEffect(() => {
     if (status === "loading") return
 
-    async function fetchGroup() {
+    async function fetchData() {
       try {
-        const response = await fetch(`/api/groups/${groupId}`)
-        const data = await response.json()
+        // Fetch group details and dashboard data in parallel
+        const [groupRes, dashboardRes] = await Promise.all([
+          fetch(`/api/groups/${groupId}`),
+          fetch(`/api/groups/${groupId}/dashboard`)
+        ])
 
-        if (!response.ok) {
-          setError(data.error || "Failed to load group")
+        const groupData = await groupRes.json()
+        const dashboardData = await dashboardRes.json()
+
+        if (!groupRes.ok) {
+          setError(groupData.error || "Failed to load group")
           return
         }
 
-        setGroup(data.group)
+        setGroup(groupData.group)
+
+        if (dashboardRes.ok) {
+          setDashboard(dashboardData)
+        }
       } catch (err) {
         setError("Failed to load group")
       } finally {
@@ -67,7 +118,7 @@ export default function GroupDetailPage() {
       }
     }
 
-    fetchGroup()
+    fetchData()
   }, [groupId, status])
 
   if (status === "loading" || loading) {
@@ -179,7 +230,38 @@ export default function GroupDetailPage() {
               <CardDescription>Games members are currently playing</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">No one is playing anything yet.</p>
+              {dashboard?.nowPlaying && dashboard.nowPlaying.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {dashboard.nowPlaying.map((entry) => (
+                    <div key={entry.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                      {entry.game.coverUrl ? (
+                        <img
+                          src={entry.game.coverUrl}
+                          alt={entry.game.name}
+                          className="w-12 h-16 object-cover rounded"
+                        />
+                      ) : (
+                        <div className="w-12 h-16 bg-muted rounded flex items-center justify-center text-xs text-muted-foreground">
+                          No img
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{entry.game.name}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium">
+                            {entry.user.name?.charAt(0) || entry.user.email.charAt(0)}
+                          </div>
+                          <span className="text-sm text-muted-foreground truncate">
+                            {entry.user.name || entry.user.email}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground">No one is playing anything yet.</p>
+              )}
             </CardContent>
           </Card>
 
@@ -218,7 +300,33 @@ export default function GroupDetailPage() {
               <CardDescription>Games on members' wishlists</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">No games on wishlists yet.</p>
+              {dashboard?.mostWanted && dashboard.mostWanted.length > 0 ? (
+                <div className="space-y-3">
+                  {dashboard.mostWanted.map((item) => (
+                    <div key={item.game.id} className="flex items-center gap-3">
+                      {item.game.coverUrl ? (
+                        <img
+                          src={item.game.coverUrl}
+                          alt={item.game.name}
+                          className="w-10 h-14 object-cover rounded"
+                        />
+                      ) : (
+                        <div className="w-10 h-14 bg-muted rounded flex items-center justify-center text-xs text-muted-foreground">
+                          No img
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{item.game.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {item.count} {item.count === 1 ? "person wants" : "people want"} this
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground">No games on wishlists yet.</p>
+              )}
             </CardContent>
           </Card>
 
@@ -229,7 +337,41 @@ export default function GroupDetailPage() {
               <CardDescription>Latest additions to members' lists</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">No games have been added yet.</p>
+              {dashboard?.recentlyAdded && dashboard.recentlyAdded.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {dashboard.recentlyAdded.slice(0, 6).map((entry) => (
+                    <div key={entry.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                      {entry.game.coverUrl ? (
+                        <img
+                          src={entry.game.coverUrl}
+                          alt={entry.game.name}
+                          className="w-12 h-16 object-cover rounded"
+                        />
+                      ) : (
+                        <div className="w-12 h-16 bg-muted rounded flex items-center justify-center text-xs text-muted-foreground">
+                          No img
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{entry.game.name}</p>
+                        <p className="text-xs text-muted-foreground capitalize">
+                          {entry.status.toLowerCase().replace("_", " ")}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <div className="w-4 h-4 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-medium">
+                            {entry.user.name?.charAt(0) || entry.user.email.charAt(0)}
+                          </div>
+                          <span className="text-xs text-muted-foreground truncate">
+                            {entry.user.name || entry.user.email}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground">No games have been added yet.</p>
+              )}
             </CardContent>
           </Card>
         </div>

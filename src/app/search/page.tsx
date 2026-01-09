@@ -38,6 +38,8 @@ export default function SearchPage() {
   const [addingToList, setAddingToList] = useState(false)
   const [selectedStatus, setSelectedStatus] = useState("NOW_PLAYING")
   const [notes, setNotes] = useState("")
+  const [rating, setRating] = useState("")
+  const [platform, setPlatform] = useState("")
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
 
@@ -67,6 +69,8 @@ export default function SearchPage() {
     setSelectedGame(game)
     setSelectedStatus("NOW_PLAYING")
     setNotes("")
+    setRating("")
+    setPlatform("")
     setError("")
     setSuccess("")
     setShowAddModal(true)
@@ -87,6 +91,8 @@ export default function SearchPage() {
           gameId: selectedGame.id,
           status: selectedStatus,
           notes: notes || null,
+          rating: rating ? parseInt(rating, 10) : null,
+          platform: platform || null,
         }),
       })
 
@@ -230,6 +236,41 @@ export default function SearchPage() {
                           {option.label}
                         </option>
                       ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="rating">Rating (1-10)</Label>
+                    <input
+                      type="number"
+                      id="rating"
+                      min="1"
+                      max="10"
+                      value={rating}
+                      onChange={(e) => setRating(e.target.value)}
+                      className="w-full p-2 border rounded-md bg-background"
+                      placeholder="Rate this game (optional)"
+                      disabled={addingToList}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="platform">Platform</Label>
+                    <select
+                      id="platform"
+                      value={platform}
+                      onChange={(e) => setPlatform(e.target.value)}
+                      className="w-full p-2 border rounded-md bg-background"
+                      disabled={addingToList}
+                    >
+                      <option value="">Select platform (optional)</option>
+                      <option value="PC">PC</option>
+                      <option value="PlayStation 5">PlayStation 5</option>
+                      <option value="PlayStation 4">PlayStation 4</option>
+                      <option value="Xbox Series X|S">Xbox Series X|S</option>
+                      <option value="Xbox One">Xbox One</option>
+                      <option value="Nintendo Switch">Nintendo Switch</option>
+                      <option value="Steam Deck">Steam Deck</option>
+                      <option value="Mobile">Mobile</option>
+                      <option value="Other">Other</option>
                     </select>
                   </div>
                   <div className="space-y-2">

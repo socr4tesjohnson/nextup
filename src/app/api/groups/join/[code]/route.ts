@@ -15,7 +15,7 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const inviteCode = params.code.toUpperCase()
+    const inviteCode = params.code
 
     // Find group by invite code
     const group = await prisma.group.findUnique({

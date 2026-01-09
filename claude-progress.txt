@@ -1,90 +1,79 @@
 # NextUp Development Progress
 
-## Last Updated: Session 2
+## Last Updated: Session 3
 
-## Current Status: 12/150 features passing (8%)
+## Current Status: 18/150 features passing (12%)
 
 ## Completed Features
 
-### Feature #1: Unauthenticated user redirected from protected routes - PASSING
-- Middleware redirects to /login with callbackUrl for /dashboard, /groups, /me, /settings, /search
+### Features #1-12: Core authentication, security, and list management - PASSING
+- Middleware redirects unauthenticated users with callbackUrl
+- Non-admin cannot access group settings
+- API returns 401 for unauthenticated requests
+- Logout clears session and redirects
+- Cannot access other user's private data
+- Sidebar navigation works correctly
+- Create/edit/delete game list entries
+- Data persists after refresh
 
-### Feature #2: Non-admin cannot access group settings - PASSING
-- Group detail page hides Settings button for non-admins
-- Settings page redirects non-admins to group page
-- API returns 403 for non-admin access
+### Feature #13: Deleted list entry is removed completely - PASSING
+- Remove button with confirmation dialog
+- Entry removed from database
+- Search shows "Add to List" for deleted games
 
-### Feature #3: API returns 401 for unauthenticated requests - PASSING
-- /api/users/me returns 401
-- /api/groups returns 401
-- /api/lists returns 401
+### Feature #14: Dashboard statistics reflect real counts - PASSING
+- Dashboard fetches real data from /api/lists and /api/groups
+- Now Playing and Wishlist counts with badges
+- Counts update when games added or status changed
 
-### Feature #4: Logout clears session and redirects - PASSING
-- Settings page has Sign Out button using NextAuth signOut()
-- Redirects to home page after logout
+### Feature #15: Data persists after logout and login - PASSING
+- Created entry with unique note "PERSIST_TEST_789"
+- Entry still present after logout and re-login
 
-### Feature #5: Cannot access other user's private data via URL manipulation - PASSING
-- /api/lists/[id] checks ownership before returning data
-- Returns 403 for non-owner access
+### Feature #16: Create group workflow complete - PASSING
+- Create Group button opens modal
+- Enter group name "Test Group ABC"
+- Group created and user redirected to group page
+- Group appears in groups list
+- Group dashboard loads with correct name
 
-### Feature #6: Sidebar navigation works correctly - PASSING
-- Navigation includes Dashboard, Groups, My Lists, Search, Settings
-- All links point to correct routes
-- Active state highlighting
+### Feature #17: Join group via invite link - PASSING
+- Fixed invite code case sensitivity issue
+- Invite code visible in group settings
+- Second user can join via invite code
+- Both members visible in group dashboard
+- Group appears in new member's groups list
 
-### Features #7-10: Various security and functional features - PASSING
+### Feature #18: Add game to list with all fields - PASSING
+- Added Rating and Platform fields to Add to List modal
+- Added Platform field to Edit modal
+- All fields (status, rating, platform, notes) save correctly
+- All fields display on game cards
+- Edit modal loads all saved values correctly
 
-### Feature #11: Create game list entry with unique data - PASSING
-- Fixed game search API to use correct Prisma composite key (provider_providerGameId)
-- Search returns sample games when no local matches
-- Games are upserted to database on search
-- Add to List modal with status selection and notes
-- Entry persists after page refresh with correct data
+## Code Changes This Session
 
-### Feature #12: Edited list entry persists after refresh - PASSING
-- Added Edit button to My Lists page
-- Edit modal with status dropdown, rating input (1-10), notes textarea
-- PATCH API endpoint updates entries correctly
-- Changes persist after page refresh
+### Search Page (src/app/search/page.tsx)
+- Added rating state and input field
+- Added platform state and dropdown
+- Updated API call to include rating and platform
 
-## Architecture
+### My Lists Page (src/app/me/page.tsx)
+- Added platform to edit modal state
+- Added platform dropdown to edit modal
+- Added platform display on game cards
+- Updated save handler to include platform
 
-### API Routes Created
-- `/api/auth/[...nextauth]` - NextAuth handler
-- `/api/auth/register` - User registration
-- `/api/users/me` - User profile CRUD
-- `/api/groups` - Groups list/create
-- `/api/groups/[id]` - Group CRUD
-- `/api/groups/[id]/settings` - Group settings (admin only)
-- `/api/groups/[id]/invite` - Regenerate invite code
-- `/api/groups/join/[code]` - Join group via code
-- `/api/lists` - User game list entries (GET, POST)
-- `/api/lists/[id]` - Individual list entry CRUD (GET, PATCH, DELETE)
-- `/api/games/search` - Game search with sample data
+### Invite Code Fix
+- `/api/groups/join/[code]/route.ts`: Removed `.toUpperCase()` conversion
+- `/app/groups/page.tsx`: Removed `.toUpperCase()` on input change
 
-### Pages Created
-- `/` - Landing page
-- `/login` - Login page
-- `/register` - Registration page
-- `/dashboard` - User dashboard (protected)
-- `/groups` - Groups list (protected)
-- `/groups/[id]` - Group detail (protected)
-- `/groups/[id]/settings` - Group settings (admin only)
-- `/me` - User's game lists with edit functionality (protected)
-- `/search` - Game search with Add to List modal (protected)
-- `/settings` - User settings (protected)
-
-### Components Created
-- `Header` - Shared navigation header with Sign Out
-- `Button` - UI button
-- `Card` - UI card
-- `Input` - Form input
-- `Label` - Form label
-- `SessionProvider` - NextAuth session
-- `ThemeProvider` - Theme support
+## Test Users
+- test@example.com / testpass123 (Test User) - Group owner
+- second@example.com / testpass123 (Second User) - Group member
 
 ## Server
-- Development server: http://localhost:3002 (port may vary)
+- Development server: http://localhost:3002
 - NEXTAUTH_URL configured in .env
 - Start with: `npm run dev --prefix /g/Projects/NextUp`
 
@@ -93,11 +82,6 @@
 - Sync schema: `npx prisma db push`
 
 ## What To Work On Next
-- Feature #13 and beyond
-- More game list functionality
-- Group dashboard features
-
-## Session Notes
-- Fixed game search API issue with Prisma composite key
-- Added edit modal to My Lists page
-- All tests verified with browser automation screenshots
+- Feature #19 and beyond
+- More group functionality
+- Game sharing between group members

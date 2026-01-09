@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
+import { compare } from "bcryptjs"
 import { authOptions } from "@/lib/auth/options"
 import { prisma } from "@/lib/db/prisma"
 
@@ -146,7 +147,7 @@ export async function PATCH(
   }
 }
 
-// DELETE /api/groups/[id] - Delete group (owner only)
+// DELETE /api/groups/[id] - Delete group (owner only, requires password)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -159,6 +160,47 @@ export async function DELETE(
     }
 
     const groupId = params.id
+
+    // Parse request body for password
+    let password: string | undefined
+    try {
+      const body = await request.json()
+      password = body.password
+    } catch {
+      return NextResponse.json(
+        { error: "Password is required to delete a group" },
+        { status: 400 }
+      )
+    }
+
+    if (!password) {
+      return NextResponse.json(
+        { error: "Password is required to delete a group" },
+        { status: 400 }
+      )
+    }
+
+    // Get user with password hash
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { id: true, passwordHash: true }
+    })
+
+    if (!user || !user.passwordHash) {
+      return NextResponse.json(
+        { error: "Unable to verify password" },
+        { status: 400 }
+      )
+    }
+
+    // Verify password
+    const isValidPassword = await compare(password, user.passwordHash)
+    if (!isValidPassword) {
+      return NextResponse.json(
+        { error: "Incorrect password" },
+        { status: 401 }
+      )
+    }
 
     // Check if user is the owner
     const group = await prisma.group.findUnique({

@@ -66,8 +66,22 @@ export default function MyListsPage() {
   const [editStatus, setEditStatus] = useState("")
   const [editRating, setEditRating] = useState<string>("")
   const [editNotes, setEditNotes] = useState("")
+  const [editPlatform, setEditPlatform] = useState("")
   const [saving, setSaving] = useState(false)
   const [editError, setEditError] = useState("")
+
+  const PLATFORM_OPTIONS = [
+    { value: "", label: "Select platform (optional)" },
+    { value: "PC", label: "PC" },
+    { value: "PlayStation 5", label: "PlayStation 5" },
+    { value: "PlayStation 4", label: "PlayStation 4" },
+    { value: "Xbox Series X|S", label: "Xbox Series X|S" },
+    { value: "Xbox One", label: "Xbox One" },
+    { value: "Nintendo Switch", label: "Nintendo Switch" },
+    { value: "Steam Deck", label: "Steam Deck" },
+    { value: "Mobile", label: "Mobile" },
+    { value: "Other", label: "Other" },
+  ]
 
   useEffect(() => {
     if (sessionStatus === "loading") return
@@ -96,6 +110,29 @@ export default function MyListsPage() {
     fetchEntries()
   }, [sessionStatus, filter])
 
+  const handleQuickStatusChange = async (entryId: string, newStatus: string) => {
+    try {
+      const response = await fetch(`/api/lists/${entryId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      })
+
+      if (response.ok) {
+        // Update the entry in local state
+        setEntries(entries.map((e) =>
+          e.id === entryId ? { ...e, status: newStatus } : e
+        ))
+      } else {
+        const data = await response.json()
+        setError(data.error || "Failed to update status")
+      }
+    } catch (err) {
+      console.error("Error updating status:", err)
+      setError("Failed to update status")
+    }
+  }
+
   const handleDelete = async (entryId: string) => {
     if (!confirm("Are you sure you want to remove this game from your list?")) {
       return
@@ -123,6 +160,7 @@ export default function MyListsPage() {
     setEditStatus(entry.status)
     setEditRating(entry.rating?.toString() || "")
     setEditNotes(entry.notes || "")
+    setEditPlatform(entry.platform || "")
     setEditError("")
     setShowEditModal(true)
   }
@@ -142,6 +180,7 @@ export default function MyListsPage() {
           status: editStatus,
           rating: editRating ? parseInt(editRating, 10) : null,
           notes: editNotes || null,
+          platform: editPlatform || null,
         }),
       })
 
@@ -155,7 +194,7 @@ export default function MyListsPage() {
       // Update the entry in the local state
       setEntries(entries.map((e) =>
         e.id === editingEntry.id
-          ? { ...e, status: editStatus, rating: editRating ? parseInt(editRating, 10) : null, notes: editNotes || null }
+          ? { ...e, status: editStatus, rating: editRating ? parseInt(editRating, 10) : null, notes: editNotes || null, platform: editPlatform || null }
           : e
       ))
 
@@ -276,23 +315,48 @@ export default function MyListsPage() {
                       Rating: {entry.rating}/10
                     </p>
                   )}
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => openEditModal(entry)}
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => handleDelete(entry.id)}
-                    >
-                      Remove
-                    </Button>
+                  {entry.platform && (
+                    <p className="text-sm text-muted-foreground">
+                      Platform: {entry.platform}
+                    </p>
+                  )}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor={`quick-status-${entry.id}`} className="text-sm whitespace-nowrap">
+                        Status:
+                      </Label>
+                      <select
+                        id={`quick-status-${entry.id}`}
+                        value={entry.status}
+                        onChange={(e) => handleQuickStatusChange(entry.id, e.target.value)}
+                        className="flex-1 p-1.5 text-sm border rounded-md bg-background"
+                        aria-label="Quick status change"
+                      >
+                        {STATUS_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => openEditModal(entry)}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => handleDelete(entry.id)}
+                      >
+                        Remove
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -346,6 +410,22 @@ export default function MyListsPage() {
                       placeholder="Rate this game (optional)"
                       disabled={saving}
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-platform">Platform</Label>
+                    <select
+                      id="edit-platform"
+                      value={editPlatform}
+                      onChange={(e) => setEditPlatform(e.target.value)}
+                      className="w-full p-2 border rounded-md bg-background"
+                      disabled={saving}
+                    >
+                      {PLATFORM_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="edit-notes">Notes (optional)</Label>

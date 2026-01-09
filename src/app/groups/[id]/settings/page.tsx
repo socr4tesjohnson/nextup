@@ -8,6 +8,17 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 interface GroupSettings {
   id: string
@@ -35,6 +46,10 @@ export default function GroupSettingsPage() {
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
   const [name, setName] = useState("")
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deletePassword, setDeletePassword] = useState("")
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState("")
 
   useEffect(() => {
     if (status === "loading") return
@@ -113,6 +128,44 @@ export default function GroupSettingsPage() {
     } catch (err) {
       setError("Failed to regenerate invite code")
     }
+  }
+
+  const handleDeleteGroup = async () => {
+    if (!deletePassword) {
+      setDeleteError("Password is required")
+      return
+    }
+
+    setDeleting(true)
+    setDeleteError("")
+
+    try {
+      const response = await fetch(`/api/groups/${groupId}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: deletePassword })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setDeleteError(data.error || "Failed to delete group")
+        setDeleting(false)
+        return
+      }
+
+      // Redirect to groups list after successful deletion
+      router.push("/groups")
+    } catch (err) {
+      setDeleteError("Failed to delete group")
+      setDeleting(false)
+    }
+  }
+
+  const handleDeleteDialogClose = () => {
+    setDeleteDialogOpen(false)
+    setDeletePassword("")
+    setDeleteError("")
   }
 
   if (status === "loading" || loading) {
@@ -281,7 +334,47 @@ export default function GroupSettingsPage() {
                 <CardDescription>Irreversible actions</CardDescription>
               </CardHeader>
               <CardContent>
-                <Button variant="destructive">Delete Group</Button>
+                <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
+                  Delete Group
+                </Button>
+                <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete Group</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This action cannot be undone. This will permanently delete the group
+                        <strong> "{settings.name}"</strong> and remove all members.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div className="py-4">
+                      <Label htmlFor="delete-password">Enter your password to confirm</Label>
+                      <Input
+                        id="delete-password"
+                        type="password"
+                        value={deletePassword}
+                        onChange={(e) => setDeletePassword(e.target.value)}
+                        placeholder="Your password"
+                        className="mt-2"
+                        disabled={deleting}
+                      />
+                      {deleteError && (
+                        <p className="text-sm text-destructive mt-2">{deleteError}</p>
+                      )}
+                    </div>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel onClick={handleDeleteDialogClose} disabled={deleting}>
+                        Cancel
+                      </AlertDialogCancel>
+                      <Button
+                        variant="destructive"
+                        onClick={handleDeleteGroup}
+                        disabled={deleting || !deletePassword}
+                      >
+                        {deleting ? "Deleting..." : "Delete Group"}
+                      </Button>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
                 <p className="text-xs text-muted-foreground mt-2">
                   This action cannot be undone. All group data will be permanently deleted.
                 </p>
