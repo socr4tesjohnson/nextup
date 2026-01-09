@@ -1,0 +1,646 @@
+<project_specification>
+  <project_name>NextUp</project_name>
+
+  <overview>
+    NextUp is a web application for groups of friends to track what games everyone is playing, share favorites/wishlists/backlogs, discover upcoming games that match the group's collective interests, and optionally receive deal alerts with purchase links. The app enables social gaming coordination by aggregating individual preferences into group-level insights and recommendations.
+  </overview>
+
+  <technology_stack>
+    <frontend>
+      <framework>Next.js 14+ (App Router) with React and TypeScript</framework>
+      <styling>Tailwind CSS with shadcn/ui components</styling>
+      <data_fetching>TanStack Query (React Query) for client-side, Server Actions for mutations</data_fetching>
+      <state_management>React Context for auth state, TanStack Query for server state</state_management>
+    </frontend>
+    <backend>
+      <runtime>Node.js via Next.js API routes and Server Actions</runtime>
+      <database>PostgreSQL</database>
+      <orm>Prisma</orm>
+      <background_jobs>BullMQ with Redis (or pg-boss as Postgres-only alternative)</background_jobs>
+      <caching>Redis for API response caching</caching>
+    </backend>
+    <communication>
+      <api>REST API via Next.js API routes + Server Actions for forms</api>
+      <external_apis>
+        <game_metadata>IGDB (via Twitch OAuth) - primary source for game data, releases, platforms</game_metadata>
+        <deals>IsThereAnyDeal (ITAD) API - PC game deals and store listings</deals>
+      </external_apis>
+    </communication>
+    <authentication>
+      <provider>NextAuth.js (Auth.js)</provider>
+      <methods>Email/password credentials + Google OAuth</methods>
+      <session_storage>Database sessions via Prisma adapter</session_storage>
+    </authentication>
+  </technology_stack>
+
+  <prerequisites>
+    <environment_setup>
+      - Node.js 18+ and npm/pnpm
+      - PostgreSQL 14+ database
+      - Redis server (for job queues and caching)
+      - IGDB API credentials (Twitch Client ID and Secret)
+      - IsThereAnyDeal API key
+      - Google OAuth credentials (Client ID and Secret)
+      - SMTP credentials for email (password reset, notifications)
+    </environment_setup>
+  </prerequisites>
+
+  <feature_count>150</feature_count>
+
+  <security_and_access_control>
+    <user_roles>
+      <role name="user">
+        <permissions>
+          - Can create and manage personal game lists
+          - Can view own profile and settings
+          - Can join groups via invite link
+          - Can view group dashboards for groups they belong to
+          - Can add games to personal lists within group context
+          - Can configure personal deal preferences
+          - Cannot access other users' private data
+          - Cannot manage group settings unless admin
+        </permissions>
+        <protected_routes>
+          - /dashboard/* (authenticated users only)
+          - /groups/* (authenticated users only)
+          - /me/* (authenticated users only)
+          - /settings/* (authenticated users only)
+        </protected_routes>
+      </role>
+      <role name="group_admin">
+        <permissions>
+          - All user permissions within the group
+          - Can invite new members to the group
+          - Can remove members from the group
+          - Can manage group settings (name, default platforms, regions)
+          - Can configure group-level preferences
+          - Can delete the group (if owner)
+        </permissions>
+        <protected_routes>
+          - /groups/:id/settings (group admin only)
+          - /groups/:id/members/manage (group admin only)
+        </protected_routes>
+      </role>
+    </user_roles>
+    <authentication>
+      <method>Email/password + Google OAuth</method>
+      <session_timeout>30 days (with refresh)</session_timeout>
+      <password_requirements>Minimum 8 characters, at least one letter and one number</password_requirements>
+    </authentication>
+    <sensitive_operations>
+      - Delete account requires password confirmation
+      - Leave group requires confirmation
+      - Delete group requires password confirmation (owner only)
+      - Removing members requires confirmation
+    </sensitive_operations>
+  </security_and_access_control>
+
+  <core_features>
+    <authentication>
+      - Email/password registration with email verification
+      - Email/password login
+      - Google OAuth login/registration
+      - Password reset via email
+      - Session management (logout, view sessions)
+      - Profile management (name, avatar, email)
+      - Account deletion with confirmation
+    </authentication>
+
+    <groups>
+      - Create new group with name
+      - Generate shareable invite link
+      - Join group via invite link
+      - View list of joined groups
+      - Group dashboard with member activity
+      - Leave group (with confirmation)
+      - Group admin: rename group
+      - Group admin: regenerate invite link
+      - Group admin: remove members
+      - Group admin: transfer ownership
+      - Group admin: delete group
+      - Group settings: default platforms preference
+      - Group settings: default region preference
+    </groups>
+
+    <game_search_and_integration>
+      - Search games via IGDB API
+      - View game detail page (cover, description, platforms, release date, genres)
+      - Cache search results (5-30 minutes TTL)
+      - Cache game details (24 hours TTL)
+      - Handle API rate limiting gracefully
+      - Display loading states during search
+      - Show "no results" for empty searches
+      - Upsert games to local database on add
+    </game_search_and_integration>
+
+    <personal_lists>
+      - Add game to list with status selection
+      - Status options: Now Playing, Finished, Dropped, Backlog, Wishlist, Favorite
+      - Edit list entry (change status, rating, notes, platform)
+      - Remove game from list
+      - Optional: Add rating (1-10 scale)
+      - Optional: Add personal notes
+      - Optional: Specify platform(s) played on
+      - Optional: Add started date
+      - Optional: Add finished date
+      - View all personal lists by status
+      - Filter personal list by platform
+      - Sort personal list by date added, rating, name
+      - Quick status change from list view
+    </personal_lists>
+
+    <group_dashboard>
+      - "Now Playing" section: grid of games currently being played by members
+      - Show member avatars next to games they're playing
+      - "Most Wanted" section: aggregated wishlist/looking-forward-to games
+      - Show vote count for most wanted games
+      - "Recently Added" section: latest additions across all members
+      - Click game to see which members have it and their status
+      - Filter dashboard by platform
+      - Refresh dashboard data
+    </group_dashboard>
+
+    <upcoming_discovery>
+      - Nightly job: compute group interest profile from member lists
+      - Interest signals: weighted genres, franchises, platforms, themes
+      - Weights: Favorite (5x), Now Playing (3x), Wishlist (2x), Finished (2x)
+      - Nightly job: fetch upcoming releases from IGDB (next 180 days)
+      - Score upcoming games against group interest profile
+      - Store top 50 recommendations per group
+      - "Upcoming Radar" UI section on group dashboard
+      - "Why recommended?" explanation for each suggestion
+      - Dismiss recommendation (per user)
+      - Manually refresh recommendations
+      - Filter recommendations by platform
+      - Sort recommendations by score, release date
+    </upcoming_discovery>
+
+    <deals>
+      - Per-user opt-in for deal tracking
+      - Configure deal preferences: platforms (PC, PS5, Xbox, Switch)
+      - Configure deal preferences: stores (Steam, GOG, Epic, etc.)
+      - Configure deal preferences: price threshold
+      - Configure deal preferences: region
+      - Configure notification rules: discount percentage, under threshold, historical low
+      - "Where to Buy" section on game detail page
+      - Show current prices across stores
+      - Show discount percentage
+      - Indicate historical low prices
+      - Link to store pages (external)
+      - Scheduled job: fetch deals every 6-12 hours
+      - Deal history for each game
+      - Email notifications for deal alerts (based on user rules)
+    </deals>
+
+    <game_detail_page>
+      - Game cover image and banner
+      - Title, description, genres, themes
+      - Platforms and release dates
+      - Your status and rating (if added)
+      - Group members' statuses for this game
+      - "Add to List" or "Update Status" button
+      - Deals tab (if user has deals enabled)
+      - Similar games section (from IGDB)
+      - External links (official site, stores)
+    </game_detail_page>
+
+    <settings>
+      - Profile settings: name, avatar upload, email
+      - Account settings: change password, delete account
+      - Deal preferences (as detailed above)
+      - Notification preferences: email on/off for various events
+      - Privacy: control what's visible to group members
+      - Theme: light/dark mode toggle
+    </settings>
+
+    <ui_ux>
+      - Responsive design (mobile, tablet, desktop)
+      - Dark mode support
+      - Loading skeletons for async content
+      - Toast notifications for actions
+      - Empty states with helpful messages
+      - Error boundaries with friendly error pages
+      - Keyboard navigation support
+      - Accessible forms with proper labels
+    </ui_ux>
+  </core_features>
+
+  <database_schema>
+    <tables>
+      <users>
+        - id (uuid, primary key)
+        - email (string, unique, indexed)
+        - emailVerified (datetime, nullable)
+        - name (string)
+        - image (string, nullable - avatar URL)
+        - passwordHash (string, nullable - for credentials auth)
+        - createdAt (datetime)
+        - updatedAt (datetime)
+      </users>
+
+      <accounts>
+        - id (uuid, primary key)
+        - userId (uuid, foreign key to users)
+        - type (string - oauth, credentials)
+        - provider (string - google, credentials)
+        - providerAccountId (string)
+        - access_token (string, nullable)
+        - refresh_token (string, nullable)
+        - expires_at (int, nullable)
+        - token_type (string, nullable)
+        - scope (string, nullable)
+        - id_token (string, nullable)
+        - Unique constraint: (provider, providerAccountId)
+      </accounts>
+
+      <sessions>
+        - id (uuid, primary key)
+        - sessionToken (string, unique)
+        - userId (uuid, foreign key to users)
+        - expires (datetime)
+      </sessions>
+
+      <verification_tokens>
+        - identifier (string)
+        - token (string, unique)
+        - expires (datetime)
+        - Unique constraint: (identifier, token)
+      </verification_tokens>
+
+      <groups>
+        - id (uuid, primary key)
+        - name (string)
+        - ownerId (uuid, foreign key to users)
+        - inviteCode (string, unique, indexed)
+        - defaultPlatforms (jsonb - array of platform strings)
+        - defaultRegion (string, nullable)
+        - createdAt (datetime)
+        - updatedAt (datetime)
+      </groups>
+
+      <group_members>
+        - id (uuid, primary key)
+        - groupId (uuid, foreign key to groups)
+        - userId (uuid, foreign key to users)
+        - role (enum: ADMIN, MEMBER)
+        - joinedAt (datetime)
+        - Unique constraint: (groupId, userId)
+        - Index: (groupId)
+        - Index: (userId)
+      </group_members>
+
+      <games>
+        - id (uuid, primary key)
+        - provider (enum: IGDB, RAWG)
+        - providerGameId (string)
+        - name (string, indexed)
+        - slug (string)
+        - description (text, nullable)
+        - coverUrl (string, nullable)
+        - bannerUrl (string, nullable)
+        - firstReleaseDate (date, nullable)
+        - genres (jsonb - array of genre objects)
+        - platforms (jsonb - array of platform objects)
+        - franchises (jsonb - array of franchise names)
+        - themes (jsonb - array of theme names)
+        - rating (float, nullable - aggregated rating from provider)
+        - createdAt (datetime)
+        - updatedAt (datetime)
+        - Unique constraint: (provider, providerGameId)
+        - Index: (name)
+        - Index: (firstReleaseDate)
+      </games>
+
+      <user_game_entries>
+        - id (uuid, primary key)
+        - userId (uuid, foreign key to users)
+        - gameId (uuid, foreign key to games)
+        - groupId (uuid, nullable, foreign key to groups)
+        - status (enum: NOW_PLAYING, FINISHED, DROPPED, BACKLOG, WISHLIST, FAVORITE)
+        - platform (string, nullable)
+        - rating (int, nullable, 1-10)
+        - notes (text, nullable)
+        - startedAt (date, nullable)
+        - finishedAt (date, nullable)
+        - createdAt (datetime)
+        - updatedAt (datetime)
+        - Unique constraint: (userId, gameId)
+        - Index: (userId, status)
+        - Index: (groupId, status)
+        - Index: (gameId)
+      </user_game_entries>
+
+      <group_interest_profiles>
+        - id (uuid, primary key)
+        - groupId (uuid, unique, foreign key to groups)
+        - computedAt (datetime)
+        - signals (jsonb - weighted genres, franchises, platforms, themes)
+        - updatedAt (datetime)
+      </group_interest_profiles>
+
+      <group_recommendations>
+        - id (uuid, primary key)
+        - groupId (uuid, foreign key to groups)
+        - gameId (uuid, foreign key to games)
+        - recommendationType (enum: UPCOMING, NEW_RELEASE, TRENDING)
+        - score (float)
+        - reason (jsonb - matching signals and explanation text)
+        - dismissedBy (jsonb - array of userIds who dismissed)
+        - createdAt (datetime)
+        - Index: (groupId, score desc)
+        - Index: (groupId, gameId)
+      </group_recommendations>
+
+      <user_deal_preferences>
+        - id (uuid, primary key)
+        - userId (uuid, unique, foreign key to users)
+        - enabled (boolean, default false)
+        - region (string, default 'US')
+        - platforms (jsonb - array: PC, PS5, XBOX, SWITCH)
+        - stores (jsonb - array: Steam, GOG, Epic, etc.)
+        - priceThreshold (decimal, nullable)
+        - notifyOn (jsonb - rules: discountPercent, underThreshold, historicalLow)
+        - createdAt (datetime)
+        - updatedAt (datetime)
+      </user_deal_preferences>
+
+      <game_deals>
+        - id (uuid, primary key)
+        - gameId (uuid, foreign key to games)
+        - provider (string - ITAD)
+        - store (string - Steam, GOG, etc.)
+        - region (string)
+        - price (decimal)
+        - msrp (decimal)
+        - discountPercent (int)
+        - url (string)
+        - isHistoricalLow (boolean)
+        - fetchedAt (datetime)
+        - Index: (gameId, fetchedAt desc)
+        - Index: (region, store)
+      </game_deals>
+    </tables>
+  </database_schema>
+
+  <api_endpoints_summary>
+    <authentication>
+      - POST /api/auth/register - email/password registration
+      - POST /api/auth/login - email/password login
+      - POST /api/auth/logout - end session
+      - POST /api/auth/forgot-password - send reset email
+      - POST /api/auth/reset-password - reset with token
+      - GET /api/auth/session - get current session
+      - NextAuth handles: /api/auth/[...nextauth] for OAuth flows
+    </authentication>
+
+    <users>
+      - GET /api/users/me - get current user profile
+      - PATCH /api/users/me - update profile
+      - DELETE /api/users/me - delete account
+      - PATCH /api/users/me/password - change password
+    </users>
+
+    <groups>
+      - GET /api/groups - list user's groups
+      - POST /api/groups - create group
+      - GET /api/groups/:id - get group details
+      - PATCH /api/groups/:id - update group (admin)
+      - DELETE /api/groups/:id - delete group (owner)
+      - POST /api/groups/:id/invite - generate/refresh invite link
+      - POST /api/groups/join/:code - join via invite code
+      - DELETE /api/groups/:id/leave - leave group
+      - GET /api/groups/:id/members - list members
+      - DELETE /api/groups/:id/members/:userId - remove member (admin)
+      - PATCH /api/groups/:id/members/:userId - change member role (admin)
+    </groups>
+
+    <games>
+      - GET /api/games/search?q=... - search IGDB
+      - GET /api/games/:id - get game details (from local DB or fetch)
+      - GET /api/games/:id/deals - get deals for game
+    </games>
+
+    <lists>
+      - GET /api/lists - get current user's list entries
+      - GET /api/lists?status=... - filter by status
+      - POST /api/lists - add game to list
+      - PATCH /api/lists/:id - update entry
+      - DELETE /api/lists/:id - remove from list
+    </lists>
+
+    <dashboard>
+      - GET /api/groups/:id/dashboard - aggregated dashboard data
+      - GET /api/groups/:id/now-playing - games being played
+      - GET /api/groups/:id/most-wanted - wishlisted games
+      - GET /api/groups/:id/recent - recently added
+      - GET /api/groups/:id/recommendations - upcoming recommendations
+      - POST /api/groups/:id/recommendations/:recId/dismiss - dismiss
+    </dashboard>
+
+    <settings>
+      - GET /api/settings/deals - get deal preferences
+      - PATCH /api/settings/deals - update deal preferences
+      - GET /api/settings/notifications - get notification prefs
+      - PATCH /api/settings/notifications - update notification prefs
+    </settings>
+  </api_endpoints_summary>
+
+  <background_jobs>
+    <scheduled_jobs>
+      - sync-upcoming-releases: Nightly at 2am - fetch upcoming games from IGDB
+      - compute-interest-profiles: Nightly at 3am - recalculate all group interest profiles
+      - generate-recommendations: Nightly at 4am - score and store recommendations
+      - sync-deals: Every 6 hours - fetch deals from ITAD for wishlisted games
+      - send-deal-notifications: Continuous - process notification queue
+      - cleanup-expired-sessions: Daily - remove expired sessions
+    </scheduled_jobs>
+  </background_jobs>
+
+  <ui_layout>
+    <main_structure>
+      - Responsive sidebar navigation (collapsible on mobile)
+      - Header with user menu, notifications bell, theme toggle
+      - Main content area with consistent padding
+      - Footer with links (optional)
+    </main_structure>
+    <navigation>
+      - Dashboard (home)
+      - My Lists (with status sub-navigation)
+      - Groups (list and individual group pages)
+      - Search (game search)
+      - Settings
+    </navigation>
+    <key_pages>
+      - Landing page (marketing, sign up CTA)
+      - Login / Register pages
+      - Dashboard (overview of all groups)
+      - Group dashboard (Now Playing, Most Wanted, Upcoming)
+      - Game search results
+      - Game detail page
+      - My Lists (filtered views)
+      - Settings (tabbed: Profile, Account, Deals, Notifications)
+    </key_pages>
+  </ui_layout>
+
+  <design_system>
+    <color_palette>
+      - Primary: Gaming-inspired purple/blue gradient (#6366f1 to #8b5cf6)
+      - Secondary: Teal accent (#14b8a6)
+      - Background Light: #f8fafc
+      - Background Dark: #0f172a
+      - Surface Light: #ffffff
+      - Surface Dark: #1e293b
+      - Text Light: #0f172a
+      - Text Dark: #f1f5f9
+      - Success: #22c55e
+      - Warning: #f59e0b
+      - Error: #ef4444
+    </color_palette>
+    <typography>
+      - Font family: Inter (system fallback: -apple-system, sans-serif)
+      - Headings: Bold weight, tight tracking
+      - Body: Regular weight, normal tracking
+      - Monospace for game IDs/codes: JetBrains Mono
+    </typography>
+    <components>
+      - Use shadcn/ui as base component library
+      - Custom game card component with cover image, title, platform badges
+      - Avatar component with fallback initials
+      - Status badges with color coding per status
+      - Rating display (stars or numeric)
+    </components>
+  </design_system>
+
+  <implementation_steps>
+    <step number="1">
+      <title>Foundation - Auth & Database</title>
+      <tasks>
+        - Initialize Next.js project with TypeScript and App Router
+        - Set up Tailwind CSS and shadcn/ui
+        - Configure Prisma with PostgreSQL
+        - Create database schema (all tables)
+        - Set up NextAuth with Google and Credentials providers
+        - Implement registration, login, logout flows
+        - Implement password reset flow
+        - Create basic layout components (header, sidebar, footer)
+      </tasks>
+    </step>
+    <step number="2">
+      <title>Groups & Membership</title>
+      <tasks>
+        - Create group CRUD API routes
+        - Implement invite link generation and joining
+        - Build groups list page
+        - Build group detail/dashboard page (empty state first)
+        - Implement member management for admins
+        - Add leave group functionality
+      </tasks>
+    </step>
+    <step number="3">
+      <title>Game Integration & Search</title>
+      <tasks>
+        - Set up IGDB API client with Twitch auth
+        - Implement game search endpoint with caching
+        - Build game search UI with results grid
+        - Implement game detail fetching and caching
+        - Build game detail page
+        - Create games table upsert logic
+      </tasks>
+    </step>
+    <step number="4">
+      <title>Personal Lists</title>
+      <tasks>
+        - Implement user_game_entries CRUD
+        - Build "Add to List" modal with status selection
+        - Build My Lists page with status filtering
+        - Implement quick status change
+        - Add rating, notes, platform fields
+        - Build list entry edit modal
+      </tasks>
+    </step>
+    <step number="5">
+      <title>Group Dashboard</title>
+      <tasks>
+        - Build "Now Playing" aggregation query and UI
+        - Build "Most Wanted" aggregation query and UI
+        - Build "Recently Added" query and UI
+        - Add member avatars to game cards
+        - Implement dashboard refresh
+        - Add platform filtering
+      </tasks>
+    </step>
+    <step number="6">
+      <title>Upcoming Discovery (Background Jobs)</title>
+      <tasks>
+        - Set up BullMQ with Redis
+        - Implement interest profile computation job
+        - Implement upcoming releases sync job
+        - Implement recommendation scoring algorithm
+        - Store recommendations in database
+        - Build "Upcoming Radar" UI section
+        - Add "Why recommended?" explanations
+        - Implement dismiss functionality
+      </tasks>
+    </step>
+    <step number="7">
+      <title>Deals Integration</title>
+      <tasks>
+        - Set up IsThereAnyDeal API client
+        - Implement deal preferences settings UI
+        - Implement deals sync job
+        - Build "Where to Buy" section on game detail
+        - Show deal history
+        - Implement deal notification logic
+        - Send email notifications for deal alerts
+      </tasks>
+    </step>
+    <step number="8">
+      <title>Polish & Optimization</title>
+      <tasks>
+        - Implement dark mode toggle
+        - Add loading skeletons throughout
+        - Improve error handling and error pages
+        - Add toast notifications for all actions
+        - Optimize database queries
+        - Add proper caching headers
+        - Responsive design fixes
+        - Accessibility improvements
+        - Write tests (unit, integration, E2E)
+      </tasks>
+    </step>
+  </implementation_steps>
+
+  <success_criteria>
+    <functionality>
+      - Users can register/login via email or Google
+      - Users can create groups and invite friends
+      - Users can search for any PC/console game and add to lists
+      - Group dashboards show real-time aggregated data from all members
+      - Upcoming recommendations appear based on group preferences
+      - Deal alerts work for opted-in users on wishlisted games
+      - All CRUD operations work correctly with data persistence
+    </functionality>
+    <user_experience>
+      - App loads quickly (<3s initial load)
+      - All actions provide immediate feedback
+      - Mobile experience is fully functional
+      - Empty states guide users on what to do
+      - Error messages are helpful and actionable
+    </user_experience>
+    <technical_quality>
+      - No console errors in production
+      - API responses are properly typed
+      - Database queries are optimized (no N+1 problems)
+      - Background jobs run reliably on schedule
+      - External API failures are handled gracefully with fallbacks
+      - All sensitive routes are protected
+    </technical_quality>
+    <design_polish>
+      - Consistent visual language throughout
+      - Dark mode works on all pages
+      - Game covers and images load smoothly with fallbacks
+      - Animations are subtle and purposeful
+      - Typography is readable at all sizes
+    </design_polish>
+  </success_criteria>
+</project_specification>
