@@ -1,59 +1,103 @@
 # NextUp Development Progress
 
-## Last Updated: Session 1
+## Last Updated: Session 2
 
-## Current Status: 1/150 features passing (0.67%)
+## Current Status: 12/150 features passing (8%)
 
-## Completed in This Session
+## Completed Features
 
-### Feature #1: Unauthenticated user redirected from protected routes
-- **Status**: PASSING
-- **What was built**:
-  - Complete Next.js 14 app foundation with App Router
-  - NextAuth.js authentication system with credentials and Google OAuth
-  - Protected route middleware for /dashboard, /groups, /me, /settings
-  - Landing page with hero section and features
-  - Login and register pages with forms
-  - Basic UI components (button, card, input, label)
-  - Prisma setup with SQLite for development
-  - Theme provider for dark/light mode support
+### Feature #1: Unauthenticated user redirected from protected routes - PASSING
+- Middleware redirects to /login with callbackUrl for /dashboard, /groups, /me, /settings, /search
 
-### Files Created
-- `/src/app/layout.tsx` - Root layout with providers
-- `/src/app/page.tsx` - Landing page
-- `/src/app/login/page.tsx` - Login page
-- `/src/app/register/page.tsx` - Registration page
-- `/src/app/dashboard/page.tsx` - Dashboard (protected)
-- `/src/app/groups/page.tsx` - Groups page (protected)
-- `/src/app/me/page.tsx` - My Lists page (protected)
-- `/src/app/settings/page.tsx` - Settings page (protected)
-- `/src/app/api/auth/[...nextauth]/route.ts` - NextAuth API route
-- `/src/app/api/auth/register/route.ts` - Registration API
-- `/src/middleware.ts` - Protected route middleware
-- `/src/lib/auth/options.ts` - NextAuth configuration
-- `/src/lib/db/prisma.ts` - Prisma client
-- `/src/components/providers/` - Session and theme providers
-- `/src/components/ui/` - UI components (button, card, input, label)
-- `/src/styles/globals.css` - Global styles with CSS variables
+### Feature #2: Non-admin cannot access group settings - PASSING
+- Group detail page hides Settings button for non-admins
+- Settings page redirects non-admins to group page
+- API returns 403 for non-admin access
+
+### Feature #3: API returns 401 for unauthenticated requests - PASSING
+- /api/users/me returns 401
+- /api/groups returns 401
+- /api/lists returns 401
+
+### Feature #4: Logout clears session and redirects - PASSING
+- Settings page has Sign Out button using NextAuth signOut()
+- Redirects to home page after logout
+
+### Feature #5: Cannot access other user's private data via URL manipulation - PASSING
+- /api/lists/[id] checks ownership before returning data
+- Returns 403 for non-owner access
+
+### Feature #6: Sidebar navigation works correctly - PASSING
+- Navigation includes Dashboard, Groups, My Lists, Search, Settings
+- All links point to correct routes
+- Active state highlighting
+
+### Features #7-10: Various security and functional features - PASSING
+
+### Feature #11: Create game list entry with unique data - PASSING
+- Fixed game search API to use correct Prisma composite key (provider_providerGameId)
+- Search returns sample games when no local matches
+- Games are upserted to database on search
+- Add to List modal with status selection and notes
+- Entry persists after page refresh with correct data
+
+### Feature #12: Edited list entry persists after refresh - PASSING
+- Added Edit button to My Lists page
+- Edit modal with status dropdown, rating input (1-10), notes textarea
+- PATCH API endpoint updates entries correctly
+- Changes persist after page refresh
+
+## Architecture
+
+### API Routes Created
+- `/api/auth/[...nextauth]` - NextAuth handler
+- `/api/auth/register` - User registration
+- `/api/users/me` - User profile CRUD
+- `/api/groups` - Groups list/create
+- `/api/groups/[id]` - Group CRUD
+- `/api/groups/[id]/settings` - Group settings (admin only)
+- `/api/groups/[id]/invite` - Regenerate invite code
+- `/api/groups/join/[code]` - Join group via code
+- `/api/lists` - User game list entries (GET, POST)
+- `/api/lists/[id]` - Individual list entry CRUD (GET, PATCH, DELETE)
+- `/api/games/search` - Game search with sample data
+
+### Pages Created
+- `/` - Landing page
+- `/login` - Login page
+- `/register` - Registration page
+- `/dashboard` - User dashboard (protected)
+- `/groups` - Groups list (protected)
+- `/groups/[id]` - Group detail (protected)
+- `/groups/[id]/settings` - Group settings (admin only)
+- `/me` - User's game lists with edit functionality (protected)
+- `/search` - Game search with Add to List modal (protected)
+- `/settings` - User settings (protected)
+
+### Components Created
+- `Header` - Shared navigation header with Sign Out
+- `Button` - UI button
+- `Card` - UI card
+- `Input` - Form input
+- `Label` - Form label
+- `SessionProvider` - NextAuth session
+- `ThemeProvider` - Theme support
 
 ## Server
-- Development server runs on http://localhost:3000
+- Development server: http://localhost:3002 (port may vary)
+- NEXTAUTH_URL configured in .env
 - Start with: `npm run dev --prefix /g/Projects/NextUp`
 
 ## Database
-- Using SQLite for development (prisma/dev.db)
-- Schema defined in prisma/schema.prisma
-- Run `npx prisma db push` to sync schema
+- SQLite: prisma/dev.db
+- Sync schema: `npx prisma db push`
 
-## What Should Be Worked On Next
-1. Feature #2: User registration with email/password
-2. More authentication-related features
-3. Group creation and management
+## What To Work On Next
+- Feature #13 and beyond
+- More game list functionality
+- Group dashboard features
 
-## Known Issues
-- Playwright browser automation has issues with Chrome installation (using curl for testing)
-
-## Notes
-- All protected routes correctly redirect to /login with callbackUrl
-- The app uses NextAuth.js JWT strategy for sessions
-- Prisma schema updated to use SQLite instead of PostgreSQL for easier setup
+## Session Notes
+- Fixed game search API issue with Prisma composite key
+- Added edit modal to My Lists page
+- All tests verified with browser automation screenshots
