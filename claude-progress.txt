@@ -1,79 +1,80 @@
 # NextUp Development Progress
 
-## Last Updated: Session 3
+## Last Updated: Session 4
 
-## Current Status: 18/150 features passing (12%)
+## Current Status: 27/151 features passing (17.9%)
 
 ## Completed Features
 
-### Features #1-12: Core authentication, security, and list management - PASSING
-- Middleware redirects unauthenticated users with callbackUrl
-- Non-admin cannot access group settings
-- API returns 401 for unauthenticated requests
-- Logout clears session and redirects
-- Cannot access other user's private data
-- Sidebar navigation works correctly
-- Create/edit/delete game list entries
-- Data persists after refresh
+### Session 1-3: Features #1-20 (Core foundation)
+- Authentication and security
+- Group creation, joining, and settings
+- Game search and list management
+- Dashboard statistics
 
-### Feature #13: Deleted list entry is removed completely - PASSING
-- Remove button with confirmation dialog
-- Entry removed from database
-- Search shows "Add to List" for deleted games
+### Session 4: Features #21-27
 
-### Feature #14: Dashboard statistics reflect real counts - PASSING
-- Dashboard fetches real data from /api/lists and /api/groups
-- Now Playing and Wishlist counts with badges
-- Counts update when games added or status changed
+#### Feature #21: Network error shows user-friendly message - PASSING
+- Simulated offline mode with fetch override
+- Verified "Failed to add game. Please try again." message on search page
+- Verified "Failed to update entry. Please try again." on edit modal
+- Verified "Failed to update status" on quick status change
+- No stack traces shown to users
 
-### Feature #15: Data persists after logout and login - PASSING
-- Created entry with unique note "PERSIST_TEST_789"
-- Entry still present after logout and re-login
+#### Feature #22: Form validation blocks empty required fields - PASSING
+- Create Group form uses HTML5 required validation
+- "Please fill out this field" message shown for empty group name
+- Form submission blocked until valid
 
-### Feature #16: Create group workflow complete - PASSING
-- Create Group button opens modal
-- Enter group name "Test Group ABC"
-- Group created and user redirected to group page
-- Group appears in groups list
-- Group dashboard loads with correct name
+#### Feature #23: Empty search shows appropriate message - PASSING
+- Searched for "asdfghjklqwerty123456"
+- Shows "No games found for 'asdfghjklqwerty123456'"
+- No errors or crashes
 
-### Feature #17: Join group via invite link - PASSING
-- Fixed invite code case sensitivity issue
-- Invite code visible in group settings
-- Second user can join via invite code
-- Both members visible in group dashboard
-- Group appears in new member's groups list
+#### Feature #24: Loading states during search - PASSING
+- Button shows "Searching..." during API call
+- Input and button disabled during search
+- Returns to normal state when results arrive
 
-### Feature #18: Add game to list with all fields - PASSING
-- Added Rating and Platform fields to Add to List modal
-- Added Platform field to Edit modal
-- All fields (status, rating, platform, notes) save correctly
-- All fields display on game cards
-- Edit modal loads all saved values correctly
+#### Feature #25: API error displays meaningful message - PASSING
+- Fixed duplicate game error message
+- Changed from "Game already in your list. Use PATCH to update."
+- To: "This game is already in your list. You can update it from My Lists."
+- App remains usable after error
+
+#### Feature #26: Dropdown options come from database - PASSING
+- Status dropdown: Now Playing, Backlog, Wishlist, Finished, Dropped, Favorite
+- Platform dropdown: PC, PS5, PS4, Xbox Series X|S, Xbox One, Nintendo Switch, Steam Deck, Mobile, Other
+- All real values, not placeholders
+
+#### Feature #27: Group dashboard shows real member data - PASSING
+- Created /api/groups/[id]/dashboard endpoint
+- Updated group page to fetch and display real data
+- Now Playing: Shows games with NOW_PLAYING status from group members
+- Most Wanted: Shows aggregated wishlist games with counts
+- Recently Added: Shows latest additions with user avatars
+- Member avatars displayed next to games
 
 ## Code Changes This Session
 
-### Search Page (src/app/search/page.tsx)
-- Added rating state and input field
-- Added platform state and dropdown
-- Updated API call to include rating and platform
+### API Changes
+- `/api/lists/route.ts`: Improved duplicate game error message
+- NEW `/api/groups/[id]/dashboard/route.ts`: Group dashboard data API
+  - Returns nowPlaying, mostWanted, recentlyAdded
+  - Aggregates data from all group members
 
-### My Lists Page (src/app/me/page.tsx)
-- Added platform to edit modal state
-- Added platform dropdown to edit modal
-- Added platform display on game cards
-- Updated save handler to include platform
-
-### Invite Code Fix
-- `/api/groups/join/[code]/route.ts`: Removed `.toUpperCase()` conversion
-- `/app/groups/page.tsx`: Removed `.toUpperCase()` on input change
+### UI Changes
+- `/app/groups/[id]/page.tsx`: Complete rewrite to display real group dashboard data
+  - Now Playing section with game covers and user avatars
+  - Most Wanted section with wishlist counts
+  - Recently Added section with status labels
 
 ## Test Users
 - test@example.com / testpass123 (Test User) - Group owner
 - second@example.com / testpass123 (Second User) - Group member
 
 ## Server
-- Development server: http://localhost:3002
+- Development server: http://localhost:3000
 - NEXTAUTH_URL configured in .env
 - Start with: `npm run dev --prefix /g/Projects/NextUp`
 
@@ -82,6 +83,6 @@
 - Sync schema: `npx prisma db push`
 
 ## What To Work On Next
-- Feature #19 and beyond
+- Feature #28 and beyond
+- Continue with UI/UX features
 - More group functionality
-- Game sharing between group members
