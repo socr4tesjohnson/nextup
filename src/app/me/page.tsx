@@ -53,11 +53,21 @@ const FILTER_OPTIONS = [
   { value: "FAVORITE", label: "Favorites" },
 ]
 
+const SORT_OPTIONS = [
+  { value: "date_desc", label: "Date Added (Newest)" },
+  { value: "date_asc", label: "Date Added (Oldest)" },
+  { value: "name_asc", label: "Name (A-Z)" },
+  { value: "name_desc", label: "Name (Z-A)" },
+  { value: "rating_desc", label: "Rating (Highest)" },
+  { value: "rating_asc", label: "Rating (Lowest)" },
+]
+
 export default function MyListsPage() {
   const { data: session, status: sessionStatus } = useSession()
   const [entries, setEntries] = useState<GameEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState("")
+  const [sort, setSort] = useState("date_desc")
   const [error, setError] = useState("")
 
   // Edit modal state
@@ -109,6 +119,34 @@ export default function MyListsPage() {
 
     fetchEntries()
   }, [sessionStatus, filter])
+
+  // Sort entries based on current sort option
+  const sortedEntries = [...entries].sort((a, b) => {
+    switch (sort) {
+      case "date_desc":
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      case "date_asc":
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      case "name_asc":
+        return a.game.name.localeCompare(b.game.name)
+      case "name_desc":
+        return b.game.name.localeCompare(a.game.name)
+      case "rating_desc":
+        // Entries without rating go to the end
+        if (a.rating === null && b.rating === null) return 0
+        if (a.rating === null) return 1
+        if (b.rating === null) return -1
+        return b.rating - a.rating
+      case "rating_asc":
+        // Entries without rating go to the end
+        if (a.rating === null && b.rating === null) return 0
+        if (a.rating === null) return 1
+        if (b.rating === null) return -1
+        return a.rating - b.rating
+      default:
+        return 0
+    }
+  })
 
   const handleQuickStatusChange = async (entryId: string, newStatus: string) => {
     try {
@@ -163,6 +201,31 @@ export default function MyListsPage() {
     setEditPlatform(entry.platform || "")
     setEditError("")
     setShowEditModal(true)
+  }
+
+  // Check if form has unsaved changes
+  const hasUnsavedChanges = () => {
+    if (!editingEntry) return false
+    const originalRating = editingEntry.rating?.toString() || ""
+    const originalNotes = editingEntry.notes || ""
+    const originalPlatform = editingEntry.platform || ""
+    return (
+      editStatus !== editingEntry.status ||
+      editRating !== originalRating ||
+      editNotes !== originalNotes ||
+      editPlatform !== originalPlatform
+    )
+  }
+
+  const handleCloseModal = () => {
+    if (hasUnsavedChanges()) {
+      if (!confirm("You have unsaved changes. Are you sure you want to discard them?")) {
+        return
+      }
+    }
+    setShowEditModal(false)
+    setEditingEntry(null)
+    setEditError("")
   }
 
   const handleSaveEdit = async (e: React.FormEvent) => {
@@ -225,20 +288,40 @@ export default function MyListsPage() {
           </Link>
         </div>
 
-        <div className="flex gap-2 mb-6 flex-wrap">
-          {FILTER_OPTIONS.map((option) => (
-            <Button
-              key={option.value}
-              variant={filter === option.value ? "secondary" : "ghost"}
-              size="sm"
-              onClick={() => {
-                setFilter(option.value)
-                setLoading(true)
-              }}
+        <div className="flex flex-col sm:flex-row gap-4 mb-6">
+          <div className="flex gap-2 flex-wrap flex-1">
+            {FILTER_OPTIONS.map((option) => (
+              <Button
+                key={option.value}
+                variant={filter === option.value ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => {
+                  setFilter(option.value)
+                  setLoading(true)
+                }}
+              >
+                {option.label}
+              </Button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <Label htmlFor="sort-select" className="text-sm whitespace-nowrap">
+              Sort by:
+            </Label>
+            <select
+              id="sort-select"
+              value={sort}
+              onChange={(e) => setSort(e.target.value)}
+              className="p-2 border rounded-md bg-background text-sm"
+              aria-label="Sort entries"
             >
-              {option.label}
-            </Button>
-          ))}
+              {SORT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {error && (
@@ -276,7 +359,7 @@ export default function MyListsPage() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {entries.map((entry) => (
+            {sortedEntries.map((entry) => (
               <Card key={entry.id} className="overflow-hidden">
                 <div className="aspect-[3/4] relative bg-muted">
                   {entry.game.coverUrl ? (
@@ -442,11 +525,7 @@ export default function MyListsPage() {
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => {
-                        setShowEditModal(false)
-                        setEditingEntry(null)
-                        setEditError("")
-                      }}
+                      onClick={handleCloseModal}
                       disabled={saving}
                     >
                       Cancel
