@@ -17,6 +17,15 @@ export async function GET(
 
     const groupId = params.id
 
+    // First check if the group exists
+    const group = await prisma.group.findUnique({
+      where: { id: groupId }
+    })
+
+    if (!group) {
+      return NextResponse.json({ error: "Group not found" }, { status: 404 })
+    }
+
     // Check if user is a member
     const membership = await prisma.groupMember.findUnique({
       where: {

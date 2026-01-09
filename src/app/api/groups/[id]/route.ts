@@ -37,12 +37,7 @@ export async function GET(
 
     const groupId = params.id
 
-    // Check if user is a member
-    const membership = await checkMembership(groupId, session.user.id)
-    if (!membership) {
-      return NextResponse.json({ error: "Not a member of this group" }, { status: 403 })
-    }
-
+    // First check if the group exists
     const group = await prisma.group.findUnique({
       where: { id: groupId },
       include: {
@@ -62,6 +57,12 @@ export async function GET(
 
     if (!group) {
       return NextResponse.json({ error: "Group not found" }, { status: 404 })
+    }
+
+    // Check if user is a member
+    const membership = await checkMembership(groupId, session.user.id)
+    if (!membership) {
+      return NextResponse.json({ error: "Not a member of this group" }, { status: 403 })
     }
 
     return NextResponse.json({

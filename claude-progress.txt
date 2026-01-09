@@ -1,8 +1,8 @@
 # NextUp Development Progress
 
-## Last Updated: Session 4
+## Last Updated: Session 5
 
-## Current Status: 27/151 features passing (17.9%)
+## Current Status: 37/153 features passing (24.2%)
 
 ## Completed Features
 
@@ -12,77 +12,62 @@
 - Game search and list management
 - Dashboard statistics
 
-### Session 4: Features #21-27
+### Session 4: Features #21-32
+- Error handling and validation
+- Form validation, loading states
+- Group dashboard with real member data
+- Filter/sort list entries
+- Session persistence and unsaved changes warning
 
-#### Feature #21: Network error shows user-friendly message - PASSING
-- Simulated offline mode with fetch override
-- Verified "Failed to add game. Please try again." message on search page
-- Verified "Failed to update entry. Please try again." on edit modal
-- Verified "Failed to update status" on quick status change
-- No stack traces shown to users
+### Session 5: Features #33-37
+#### Feature #33: Malformed URL parameters handled gracefully - PASSING
+- Tested /me?status=invalid_status - defaults to All filter
+- Tested /search with XSS attempts - properly escaped
+- Tested /groups/invalid-id - shows "Not a member" error
+- No crashes, graceful fallbacks
 
-#### Feature #22: Form validation blocks empty required fields - PASSING
-- Create Group form uses HTML5 required validation
-- "Please fill out this field" message shown for empty group name
-- Form submission blocked until valid
+#### Feature #34: Deep link to deleted entity shows not found - PASSING
+- Created test group "DELETE_TEST_GROUP_12345"
+- Deleted the group
+- Navigated to deleted group URL
+- Fixed API to check group existence before membership
+- Now shows "Group not found" (404) instead of "Not a member" (403)
 
-#### Feature #23: Empty search shows appropriate message - PASSING
-- Searched for "asdfghjklqwerty123456"
-- Shows "No games found for 'asdfghjklqwerty123456'"
-- No errors or crashes
+#### Feature #35: Double-click submit creates only one record - PASSING
+- Tested create group form with double-click
+- Button disabled={creating} prevents duplicate submissions
+- Verified only one group was created
 
-#### Feature #24: Loading states during search - PASSING
-- Button shows "Searching..." during API call
-- Input and button disabled during search
-- Returns to normal state when results arrive
+#### Feature #36: Submit button disabled during processing - PASSING
+- Verified code pattern across all forms:
+  - Create Group: disabled={creating}, text "Creating..."
+  - Login: disabled={isLoading}, text "Signing in..."
+  - Join Group: disabled={joining}, text "Joining..."
 
-#### Feature #25: API error displays meaningful message - PASSING
-- Fixed duplicate game error message
-- Changed from "Game already in your list. Use PATCH to update."
-- To: "This game is already in your list. You can update it from My Lists."
-- App remains usable after error
-
-#### Feature #26: Dropdown options come from database - PASSING
-- Status dropdown: Now Playing, Backlog, Wishlist, Finished, Dropped, Favorite
-- Platform dropdown: PC, PS5, PS4, Xbox Series X|S, Xbox One, Nintendo Switch, Steam Deck, Mobile, Other
-- All real values, not placeholders
-
-#### Feature #27: Group dashboard shows real member data - PASSING
-- Created /api/groups/[id]/dashboard endpoint
-- Updated group page to fetch and display real data
-- Now Playing: Shows games with NOW_PLAYING status from group members
-- Most Wanted: Shows aggregated wishlist games with counts
-- Recently Added: Shows latest additions with user avatars
-- Member avatars displayed next to games
+#### Feature #37: Delete item removes from search results - PASSING
+- Deleted Hollow Knight from list
+- Verified immediate UI update
+- Verified persistence after refresh
+- Verified propagation to group dashboard (Now Playing became empty)
+- Restored test data by re-adding the game
 
 ## Code Changes This Session
 
 ### API Changes
-- `/api/lists/route.ts`: Improved duplicate game error message
-- NEW `/api/groups/[id]/dashboard/route.ts`: Group dashboard data API
-  - Returns nowPlaying, mostWanted, recentlyAdded
-  - Aggregates data from all group members
-
-### UI Changes
-- `/app/groups/[id]/page.tsx`: Complete rewrite to display real group dashboard data
-  - Now Playing section with game covers and user avatars
-  - Most Wanted section with wishlist counts
-  - Recently Added section with status labels
+- `/api/groups/[id]/route.ts`: Reordered checks to verify group existence (404) before membership (403)
+- `/api/groups/[id]/dashboard/route.ts`: Added group existence check before membership check
 
 ## Test Users
 - test@example.com / testpass123 (Test User) - Group owner
 - second@example.com / testpass123 (Second User) - Group member
 
 ## Server
-- Development server: http://localhost:3000
-- NEXTAUTH_URL configured in .env
+- Development server: http://localhost:3002 (port may vary)
 - Start with: `npm run dev --prefix /g/Projects/NextUp`
 
 ## Database
 - SQLite: prisma/dev.db
-- Sync schema: `npx prisma db push`
 
 ## What To Work On Next
-- Feature #28 and beyond
-- Continue with UI/UX features
-- More group functionality
+- Feature #38 and beyond
+- Continue with functional and UI features
