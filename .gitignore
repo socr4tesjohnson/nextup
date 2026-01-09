@@ -50,3 +50,4 @@ features.db
 .claude_settings.json
 .claude_system_prompt.txt
 prompts/
+prisma/dev.db

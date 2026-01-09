@@ -1,0 +1,59 @@
+# NextUp Development Progress
+
+## Last Updated: Session 1
+
+## Current Status: 1/150 features passing (0.67%)
+
+## Completed in This Session
+
+### Feature #1: Unauthenticated user redirected from protected routes
+- **Status**: PASSING
+- **What was built**:
+  - Complete Next.js 14 app foundation with App Router
+  - NextAuth.js authentication system with credentials and Google OAuth
+  - Protected route middleware for /dashboard, /groups, /me, /settings
+  - Landing page with hero section and features
+  - Login and register pages with forms
+  - Basic UI components (button, card, input, label)
+  - Prisma setup with SQLite for development
+  - Theme provider for dark/light mode support
+
+### Files Created
+- `/src/app/layout.tsx` - Root layout with providers
+- `/src/app/page.tsx` - Landing page
+- `/src/app/login/page.tsx` - Login page
+- `/src/app/register/page.tsx` - Registration page
+- `/src/app/dashboard/page.tsx` - Dashboard (protected)
+- `/src/app/groups/page.tsx` - Groups page (protected)
+- `/src/app/me/page.tsx` - My Lists page (protected)
+- `/src/app/settings/page.tsx` - Settings page (protected)
+- `/src/app/api/auth/[...nextauth]/route.ts` - NextAuth API route
+- `/src/app/api/auth/register/route.ts` - Registration API
+- `/src/middleware.ts` - Protected route middleware
+- `/src/lib/auth/options.ts` - NextAuth configuration
+- `/src/lib/db/prisma.ts` - Prisma client
+- `/src/components/providers/` - Session and theme providers
+- `/src/components/ui/` - UI components (button, card, input, label)
+- `/src/styles/globals.css` - Global styles with CSS variables
+
+## Server
+- Development server runs on http://localhost:3000
+- Start with: `npm run dev --prefix /g/Projects/NextUp`
+
+## Database
+- Using SQLite for development (prisma/dev.db)
+- Schema defined in prisma/schema.prisma
+- Run `npx prisma db push` to sync schema
+
+## What Should Be Worked On Next
+1. Feature #2: User registration with email/password
+2. More authentication-related features
+3. Group creation and management
+
+## Known Issues
+- Playwright browser automation has issues with Chrome installation (using curl for testing)
+
+## Notes
+- All protected routes correctly redirect to /login with callbackUrl
+- The app uses NextAuth.js JWT strategy for sessions
+- Prisma schema updated to use SQLite instead of PostgreSQL for easier setup
