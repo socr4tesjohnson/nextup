@@ -79,6 +79,7 @@ export default function MyListsPage() {
   const [editPlatform, setEditPlatform] = useState("")
   const [saving, setSaving] = useState(false)
   const [editError, setEditError] = useState("")
+  const [successMessage, setSuccessMessage] = useState("")
 
   const PLATFORM_OPTIONS = [
     { value: "", label: "Select platform (optional)" },
@@ -263,6 +264,8 @@ export default function MyListsPage() {
 
       setShowEditModal(false)
       setEditingEntry(null)
+      setSuccessMessage(`${editingEntry.game.name} updated successfully!`)
+      setTimeout(() => setSuccessMessage(""), 3000)
     } catch (err) {
       console.error("Error updating entry:", err)
       setEditError("Failed to update entry. Please try again.")
@@ -327,6 +330,12 @@ export default function MyListsPage() {
         {error && (
           <div className="mb-4 p-3 rounded-md bg-destructive/10 text-destructive text-sm">
             {error}
+          </div>
+        )}
+
+        {successMessage && (
+          <div className="mb-4 p-3 rounded-md bg-green-500/10 text-green-600 text-sm">
+            {successMessage}
           </div>
         )}
 
