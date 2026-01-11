@@ -2,9 +2,21 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth/options"
 import { prisma } from "@/lib/db/prisma"
+import { cache, cacheKeys, cacheTTL } from "@/lib/cache"
 
 // Sample game data for testing - later will integrate with IGDB API
 const sampleGames = [
+  {
+    provider: "IGDB",
+    providerGameId: "100",
+    name: "The Witcher 3: Wild Hunt",
+    slug: "the-witcher-3-wild-hunt",
+    coverUrl: "https://images.igdb.com/igdb/image/upload/t_cover_big/co1wyy.jpg",
+    firstReleaseDate: new Date("2015-05-19"),
+    genres: JSON.stringify(["Action", "RPG", "Adventure"]),
+    platforms: JSON.stringify(["PC", "PlayStation 4", "Xbox One", "Nintendo Switch"]),
+    description: "The Witcher 3: Wild Hunt is a story-driven open world RPG set in a visually stunning fantasy universe full of meaningful choices and impactful consequences."
+  },
   {
     provider: "IGDB",
     providerGameId: "1",
@@ -108,8 +120,23 @@ export async function GET(request: NextRequest) {
     const query = searchParams.get("q")?.toLowerCase() || ""
 
     if (!query) {
-      return NextResponse.json({ games: [] })
+      return NextResponse.json({ games: [], cached: false })
     }
+
+    // Check cache first
+    const cacheKey = cacheKeys.gameSearch(query)
+    const cachedResult = await cache.get<{ games: unknown[] }>(cacheKey)
+
+    if (cachedResult) {
+      console.log(`[Cache HIT] Search query: "${query}"`)
+      return NextResponse.json({
+        games: cachedResult.games,
+        cached: true,
+        cacheKey
+      })
+    }
+
+    console.log(`[Cache MISS] Search query: "${query}"`)
 
     // First, search local database
     const localGames = await prisma.game.findMany({
@@ -121,7 +148,7 @@ export async function GET(request: NextRequest) {
       take: 20
     })
 
-    // If we have local results, return them
+    // If we have local results, cache and return them
     if (localGames.length > 0) {
       const games = localGames.map(game => ({
         id: game.id,
@@ -135,7 +162,10 @@ export async function GET(request: NextRequest) {
         isLocal: true
       }))
 
-      return NextResponse.json({ games })
+      // Cache the results
+      await cache.set(cacheKey, { games }, cacheTTL.search)
+
+      return NextResponse.json({ games, cached: false })
     }
 
     // Search sample data and upsert to database
@@ -171,7 +201,10 @@ export async function GET(request: NextRequest) {
       })
     )
 
-    return NextResponse.json({ games })
+    // Cache the results
+    await cache.set(cacheKey, { games }, cacheTTL.search)
+
+    return NextResponse.json({ games, cached: false })
   } catch (error) {
     console.error("Error searching games:", error)
     return NextResponse.json(

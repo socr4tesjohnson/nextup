@@ -44,6 +44,14 @@ export async function GET(
       include: {
         owner: {
           select: { id: true, name: true, email: true, image: true }
+        },
+        members: {
+          include: {
+            user: {
+              select: { id: true, name: true, email: true, image: true }
+            }
+          },
+          orderBy: { joinedAt: "asc" }
         }
       }
     })
@@ -60,7 +68,12 @@ export async function GET(
         defaultPlatforms: JSON.parse(group.defaultPlatforms),
         defaultRegion: group.defaultRegion,
         owner: group.owner,
-        isOwner: group.ownerId === session.user.id
+        isOwner: group.ownerId === session.user.id,
+        members: group.members.map(m => ({
+          id: m.userId,
+          role: m.role,
+          user: m.user
+        }))
       }
     })
   } catch (error) {

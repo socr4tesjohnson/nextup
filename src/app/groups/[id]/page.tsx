@@ -3,9 +3,21 @@
 import { useEffect, useState } from "react"
 import { useSession } from "next-auth/react"
 import Link from "next/link"
+import { Header } from "@/components/layout/header"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 interface GroupMember {
   id: string
@@ -86,6 +98,25 @@ export default function GroupDetailPage() {
   const [dashboard, setDashboard] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [leaving, setLeaving] = useState(false)
+  const [showLeaveDialog, setShowLeaveDialog] = useState(false)
+  const [memberToRemove, setMemberToRemove] = useState<GroupMember | null>(null)
+  const [removingMember, setRemovingMember] = useState(false)
+  const [selectedGame, setSelectedGame] = useState<{ id: string; name: string; coverUrl: string | null } | null>(null)
+
+  // Get all members' entries for a specific game
+  const getMemberEntriesForGame = (gameId: string) => {
+    if (!dashboard) return []
+    const allEntries = [...dashboard.nowPlaying, ...dashboard.recentlyAdded]
+    // Deduplicate by entry id and filter by game
+    const uniqueEntries = new Map<string, GameEntry>()
+    allEntries.forEach(entry => {
+      if (entry.game.id === gameId) {
+        uniqueEntries.set(entry.id, entry)
+      }
+    })
+    return Array.from(uniqueEntries.values())
+  }
 
   useEffect(() => {
     if (status === "loading") return
@@ -121,18 +152,57 @@ export default function GroupDetailPage() {
     fetchData()
   }, [groupId, status])
 
+  const handleLeaveGroup = async () => {
+    setLeaving(true)
+    try {
+      const res = await fetch(`/api/groups/${groupId}/leave`, {
+        method: "POST",
+      })
+
+      if (res.ok) {
+        router.push("/groups")
+      } else {
+        const data = await res.json()
+        setError(data.error || "Failed to leave group")
+      }
+    } catch (err) {
+      setError("Failed to leave group")
+    } finally {
+      setLeaving(false)
+      setShowLeaveDialog(false)
+    }
+  }
+
+  const handleRemoveMember = async () => {
+    if (!memberToRemove) return
+    setRemovingMember(true)
+    try {
+      const res = await fetch(`/api/groups/${groupId}/members/${memberToRemove.user.id}`, {
+        method: "DELETE",
+      })
+
+      if (res.ok) {
+        // Remove member from local state
+        setGroup(prev => prev ? {
+          ...prev,
+          members: prev.members.filter(m => m.id !== memberToRemove.id)
+        } : null)
+      } else {
+        const data = await res.json()
+        setError(data.error || "Failed to remove member")
+      }
+    } catch (err) {
+      setError("Failed to remove member")
+    } finally {
+      setRemovingMember(false)
+      setMemberToRemove(null)
+    }
+  }
+
   if (status === "loading" || loading) {
     return (
       <div className="min-h-screen bg-background">
-        <header className="border-b">
-          <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-            <Link href="/dashboard" className="text-xl font-bold">
-              <span className="bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">
-                NextUp
-              </span>
-            </Link>
-          </div>
-        </header>
+        <Header />
         <main className="container mx-auto px-4 py-8">
           <div className="animate-pulse">
             <div className="h-8 w-48 bg-muted rounded mb-4"></div>
@@ -219,6 +289,33 @@ export default function GroupDetailPage() {
                 <Button variant="outline">Group Settings</Button>
               </Link>
             )}
+            {!group.isOwner && (
+              <AlertDialog open={showLeaveDialog} onOpenChange={setShowLeaveDialog}>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" className="text-destructive border-destructive hover:bg-destructive/10">
+                    Leave Group
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Leave Group</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to leave "{group.name}"? You will need a new invite link to rejoin.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={leaving}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleLeaveGroup}
+                      disabled={leaving}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      {leaving ? "Leaving..." : "Leave Group"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
           </div>
         </div>
 
@@ -233,7 +330,11 @@ export default function GroupDetailPage() {
               {dashboard?.nowPlaying && dashboard.nowPlaying.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {dashboard.nowPlaying.map((entry) => (
-                    <div key={entry.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                    <div
+                      key={entry.id}
+                      className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted/80 transition-colors"
+                      onClick={() => setSelectedGame(entry.game)}
+                    >
                       {entry.game.coverUrl ? (
                         <img
                           src={entry.game.coverUrl}
@@ -287,11 +388,99 @@ export default function GroupDetailPage() {
                         {group.ownerId === member.user.id && " • Owner"}
                       </p>
                     </div>
+                    {isAdmin && member.user.id !== group.ownerId && member.user.id !== session?.user?.id && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => setMemberToRemove(member)}
+                      >
+                        Remove
+                      </Button>
+                    )}
                   </div>
                 ))}
               </div>
             </CardContent>
           </Card>
+
+          {/* Remove Member Dialog */}
+          <AlertDialog open={!!memberToRemove} onOpenChange={() => setMemberToRemove(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Remove Member</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to remove {memberToRemove?.user.name || memberToRemove?.user.email} from the group?
+                  They will need a new invite link to rejoin.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={removingMember}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleRemoveMember}
+                  disabled={removingMember}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  {removingMember ? "Removing..." : "Remove Member"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          {/* Game Details Modal */}
+          {selectedGame && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+              <Card className="w-full max-w-md mx-4">
+                <CardHeader>
+                  <div className="flex items-start gap-4">
+                    {selectedGame.coverUrl ? (
+                      <img
+                        src={selectedGame.coverUrl}
+                        alt={selectedGame.name}
+                        className="w-16 h-20 object-cover rounded"
+                      />
+                    ) : (
+                      <div className="w-16 h-20 bg-muted rounded flex items-center justify-center text-xs text-muted-foreground">
+                        No img
+                      </div>
+                    )}
+                    <div>
+                      <CardTitle className="text-lg">{selectedGame.name}</CardTitle>
+                      <CardDescription>Members with this game</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {getMemberEntriesForGame(selectedGame.id).length > 0 ? (
+                      getMemberEntriesForGame(selectedGame.id).map((entry) => (
+                        <div key={entry.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium">
+                              {entry.user.name?.charAt(0) || entry.user.email.charAt(0)}
+                            </div>
+                            <span className="font-medium">
+                              {entry.user.name || entry.user.email}
+                            </span>
+                          </div>
+                          <span className="text-sm text-muted-foreground px-2 py-1 rounded bg-background capitalize">
+                            {entry.status.toLowerCase().replace("_", " ")}
+                          </span>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-muted-foreground text-center py-4">No members have this game</p>
+                    )}
+                  </div>
+                  <div className="mt-4 flex justify-end">
+                    <Button variant="outline" onClick={() => setSelectedGame(null)}>
+                      Close
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
 
           {/* Most Wanted Section */}
           <Card>

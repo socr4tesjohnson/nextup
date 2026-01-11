@@ -17,23 +17,55 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
+  const [fieldErrors, setFieldErrors] = useState<{
+    name?: string
+    email?: string
+    password?: string
+    confirmPassword?: string
+  }>({})
+
+  const validateFields = () => {
+    const errors: typeof fieldErrors = {}
+
+    if (!name.trim()) {
+      errors.name = "Name is required"
+    }
+
+    if (!email.trim()) {
+      errors.email = "Email is required"
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      errors.email = "Please enter a valid email address"
+    }
+
+    if (!password) {
+      errors.password = "Password is required"
+    } else if (password.length < 8) {
+      errors.password = "Password must be at least 8 characters"
+    } else if (!/[a-zA-Z]/.test(password)) {
+      errors.password = "Password must contain at least one letter"
+    } else if (!/\d/.test(password)) {
+      errors.password = "Password must contain at least one number"
+    }
+
+    if (!confirmPassword) {
+      errors.confirmPassword = "Please confirm your password"
+    } else if (password !== confirmPassword) {
+      errors.confirmPassword = "Passwords do not match"
+    }
+
+    setFieldErrors(errors)
+    return Object.keys(errors).length === 0
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
     setError("")
 
-    if (password !== confirmPassword) {
-      setError("Passwords do not match")
-      setIsLoading(false)
+    if (!validateFields()) {
       return
     }
 
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters long")
-      setIsLoading(false)
-      return
-    }
+    setIsLoading(true)
 
     try {
       const response = await fetch("/api/auth/register", {
@@ -98,10 +130,16 @@ export default function RegisterPage() {
                 type="text"
                 placeholder="Your name"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
+                onChange={(e) => {
+                  setName(e.target.value)
+                  if (fieldErrors.name) setFieldErrors(prev => ({ ...prev, name: undefined }))
+                }}
                 disabled={isLoading}
+                className={fieldErrors.name ? "border-destructive" : ""}
               />
+              {fieldErrors.name && (
+                <p className="text-xs text-destructive">{fieldErrors.name}</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
@@ -110,10 +148,16 @@ export default function RegisterPage() {
                 type="email"
                 placeholder="you@example.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
+                onChange={(e) => {
+                  setEmail(e.target.value)
+                  if (fieldErrors.email) setFieldErrors(prev => ({ ...prev, email: undefined }))
+                }}
                 disabled={isLoading}
+                className={fieldErrors.email ? "border-destructive" : ""}
               />
+              {fieldErrors.email && (
+                <p className="text-xs text-destructive">{fieldErrors.email}</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
@@ -122,14 +166,20 @@ export default function RegisterPage() {
                 type="password"
                 placeholder="••••••••"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
+                onChange={(e) => {
+                  setPassword(e.target.value)
+                  if (fieldErrors.password) setFieldErrors(prev => ({ ...prev, password: undefined }))
+                }}
                 disabled={isLoading}
-                minLength={8}
+                className={fieldErrors.password ? "border-destructive" : ""}
               />
-              <p className="text-xs text-muted-foreground">
-                Must be at least 8 characters
-              </p>
+              {fieldErrors.password ? (
+                <p className="text-xs text-destructive">{fieldErrors.password}</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Must be at least 8 characters with a letter and number
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">Confirm Password</Label>
@@ -138,10 +188,16 @@ export default function RegisterPage() {
                 type="password"
                 placeholder="••••••••"
                 value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
+                onChange={(e) => {
+                  setConfirmPassword(e.target.value)
+                  if (fieldErrors.confirmPassword) setFieldErrors(prev => ({ ...prev, confirmPassword: undefined }))
+                }}
                 disabled={isLoading}
+                className={fieldErrors.confirmPassword ? "border-destructive" : ""}
               />
+              {fieldErrors.confirmPassword && (
+                <p className="text-xs text-destructive">{fieldErrors.confirmPassword}</p>
+              )}
             </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? "Creating account..." : "Create account"}

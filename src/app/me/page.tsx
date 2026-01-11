@@ -35,6 +35,19 @@ const STATUS_LABELS: Record<string, string> = {
   FAVORITE: "Favorite",
 }
 
+// Format timestamp for display
+function formatTimestamp(dateString: string): string {
+  const date = new Date(dateString)
+  return date.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  })
+}
+
 const STATUS_OPTIONS = [
   { value: "NOW_PLAYING", label: "Now Playing" },
   { value: "BACKLOG", label: "Backlog" },
@@ -77,6 +90,8 @@ export default function MyListsPage() {
   const [editRating, setEditRating] = useState<string>("")
   const [editNotes, setEditNotes] = useState("")
   const [editPlatform, setEditPlatform] = useState("")
+  const [editStartedAt, setEditStartedAt] = useState("")
+  const [editFinishedAt, setEditFinishedAt] = useState("")
   const [saving, setSaving] = useState(false)
   const [editError, setEditError] = useState("")
   const [successMessage, setSuccessMessage] = useState("")
@@ -194,12 +209,21 @@ export default function MyListsPage() {
     }
   }
 
+  // Helper to format date for input[type="date"]
+  const formatDateForInput = (dateString: string | null): string => {
+    if (!dateString) return ""
+    const date = new Date(dateString)
+    return date.toISOString().split("T")[0]
+  }
+
   const openEditModal = (entry: GameEntry) => {
     setEditingEntry(entry)
     setEditStatus(entry.status)
     setEditRating(entry.rating?.toString() || "")
     setEditNotes(entry.notes || "")
     setEditPlatform(entry.platform || "")
+    setEditStartedAt(formatDateForInput(entry.startedAt))
+    setEditFinishedAt(formatDateForInput(entry.finishedAt))
     setEditError("")
     setShowEditModal(true)
   }
@@ -210,11 +234,15 @@ export default function MyListsPage() {
     const originalRating = editingEntry.rating?.toString() || ""
     const originalNotes = editingEntry.notes || ""
     const originalPlatform = editingEntry.platform || ""
+    const originalStartedAt = formatDateForInput(editingEntry.startedAt)
+    const originalFinishedAt = formatDateForInput(editingEntry.finishedAt)
     return (
       editStatus !== editingEntry.status ||
       editRating !== originalRating ||
       editNotes !== originalNotes ||
-      editPlatform !== originalPlatform
+      editPlatform !== originalPlatform ||
+      editStartedAt !== originalStartedAt ||
+      editFinishedAt !== originalFinishedAt
     )
   }
 
@@ -245,6 +273,8 @@ export default function MyListsPage() {
           rating: editRating ? parseInt(editRating, 10) : null,
           notes: editNotes || null,
           platform: editPlatform || null,
+          startedAt: editStartedAt || null,
+          finishedAt: editFinishedAt || null,
         }),
       })
 
@@ -255,10 +285,11 @@ export default function MyListsPage() {
         return
       }
 
-      // Update the entry in the local state
+      // Update the entry in the local state with the returned entry (includes new updatedAt)
+      const updatedEntry = data.entry
       setEntries(entries.map((e) =>
         e.id === editingEntry.id
-          ? { ...e, status: editStatus, rating: editRating ? parseInt(editRating, 10) : null, notes: editNotes || null, platform: editPlatform || null }
+          ? { ...e, ...updatedEntry, game: e.game }
           : e
       ))
 
@@ -465,6 +496,10 @@ export default function MyListsPage() {
                 <CardDescription>
                   {editingEntry.game.name}
                 </CardDescription>
+                <div className="text-xs text-muted-foreground space-y-1 pt-2">
+                  <p>Added: {formatTimestamp(editingEntry.createdAt)}</p>
+                  <p>Last updated: {formatTimestamp(editingEntry.updatedAt)}</p>
+                </div>
               </CardHeader>
               <CardContent>
                 {editError && (
@@ -518,6 +553,30 @@ export default function MyListsPage() {
                         </option>
                       ))}
                     </select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-started-at">Started Date</Label>
+                      <input
+                        type="date"
+                        id="edit-started-at"
+                        value={editStartedAt}
+                        onChange={(e) => setEditStartedAt(e.target.value)}
+                        className="w-full p-2 border rounded-md bg-background"
+                        disabled={saving}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-finished-at">Finished Date</Label>
+                      <input
+                        type="date"
+                        id="edit-finished-at"
+                        value={editFinishedAt}
+                        onChange={(e) => setEditFinishedAt(e.target.value)}
+                        className="w-full p-2 border rounded-md bg-background"
+                        disabled={saving}
+                      />
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="edit-notes">Notes (optional)</Label>

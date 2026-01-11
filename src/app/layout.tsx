@@ -8,6 +8,9 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "NextUp - Track Games with Friends",
   description: "Track what games everyone is playing, share favorites/wishlists/backlogs, and discover upcoming games",
+  icons: {
+    icon: "/favicon.svg",
+  },
 }
 
 export default function RootLayout({

@@ -1,19 +1,12 @@
 import Link from "next/link"
+import { Header } from "@/components/layout/header"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 export default function GroupNotFound() {
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b">
-        <div className="container mx-auto px-4 py-4">
-          <Link href="/dashboard" className="text-xl font-bold">
-            <span className="bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">
-              NextUp
-            </span>
-          </Link>
-        </div>
-      </header>
+      <Header />
 
       <main className="container mx-auto px-4 py-8 flex items-center justify-center min-h-[calc(100vh-80px)]">
         <Card className="max-w-md">

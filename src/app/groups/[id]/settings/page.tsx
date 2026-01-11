@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useSession } from "next-auth/react"
 import Link from "next/link"
+import { Header } from "@/components/layout/header"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -20,6 +21,17 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
+interface GroupMember {
+  id: string
+  role: string
+  user: {
+    id: string
+    name: string | null
+    email: string
+    image: string | null
+  }
+}
+
 interface GroupSettings {
   id: string
   name: string
@@ -32,6 +44,7 @@ interface GroupSettings {
     email: string
   }
   isOwner: boolean
+  members: GroupMember[]
 }
 
 export default function GroupSettingsPage() {
@@ -50,6 +63,12 @@ export default function GroupSettingsPage() {
   const [deletePassword, setDeletePassword] = useState("")
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState("")
+
+  // Transfer ownership state
+  const [transferDialogOpen, setTransferDialogOpen] = useState(false)
+  const [selectedNewOwner, setSelectedNewOwner] = useState("")
+  const [transferring, setTransferring] = useState(false)
+  const [transferError, setTransferError] = useState("")
 
   useEffect(() => {
     if (status === "loading") return
@@ -168,18 +187,62 @@ export default function GroupSettingsPage() {
     setDeleteError("")
   }
 
+  const handleTransferOwnership = async () => {
+    if (!selectedNewOwner) {
+      setTransferError("Please select a new owner")
+      return
+    }
+
+    setTransferring(true)
+    setTransferError("")
+
+    try {
+      const response = await fetch(`/api/groups/${groupId}/transfer-ownership`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newOwnerId: selectedNewOwner })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setTransferError(data.error || "Failed to transfer ownership")
+        setTransferring(false)
+        return
+      }
+
+      // Update local state
+      const newOwnerMember = settings?.members.find(m => m.id === selectedNewOwner)
+      if (newOwnerMember && settings) {
+        setSettings({
+          ...settings,
+          owner: newOwnerMember.user,
+          isOwner: false
+        })
+      }
+
+      setSuccess("Ownership transferred successfully")
+      setTransferDialogOpen(false)
+      setSelectedNewOwner("")
+    } catch (err) {
+      setTransferError("Failed to transfer ownership")
+      setTransferring(false)
+    }
+  }
+
+  const handleTransferDialogClose = () => {
+    setTransferDialogOpen(false)
+    setSelectedNewOwner("")
+    setTransferError("")
+  }
+
+  // Get members who can become owner (anyone except current owner)
+  const eligibleNewOwners = settings?.members.filter(m => m.id !== settings.owner.id) || []
+
   if (status === "loading" || loading) {
     return (
       <div className="min-h-screen bg-background">
-        <header className="border-b">
-          <div className="container mx-auto px-4 py-4">
-            <Link href="/dashboard" className="text-xl font-bold">
-              <span className="bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">
-                NextUp
-              </span>
-            </Link>
-          </div>
-        </header>
+        <Header />
         <main className="container mx-auto px-4 py-8 max-w-2xl">
           <div className="animate-pulse">
             <div className="h-8 w-48 bg-muted rounded mb-4"></div>
@@ -326,6 +389,72 @@ export default function GroupSettingsPage() {
               </p>
             </CardContent>
           </Card>
+
+          {settings.isOwner && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Transfer Ownership</CardTitle>
+                <CardDescription>Transfer group ownership to another member</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {eligibleNewOwners.length > 0 ? (
+                  <>
+                    <p className="text-sm text-muted-foreground">
+                      Select a member to become the new owner. You will remain an admin after transfer.
+                    </p>
+                    <Button variant="outline" onClick={() => setTransferDialogOpen(true)}>
+                      Transfer Ownership
+                    </Button>
+                    <AlertDialog open={transferDialogOpen} onOpenChange={setTransferDialogOpen}>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Transfer Ownership</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Select the member you want to transfer ownership to. You will remain an admin after the transfer.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <div className="py-4">
+                          <Label htmlFor="new-owner">New Owner</Label>
+                          <select
+                            id="new-owner"
+                            value={selectedNewOwner}
+                            onChange={(e) => setSelectedNewOwner(e.target.value)}
+                            className="w-full mt-2 p-2 border rounded-md bg-background"
+                            disabled={transferring}
+                          >
+                            <option value="">Select a member...</option>
+                            {eligibleNewOwners.map((member) => (
+                              <option key={member.id} value={member.id}>
+                                {member.user.name || member.user.email} {member.role === "ADMIN" ? "(Admin)" : "(Member)"}
+                              </option>
+                            ))}
+                          </select>
+                          {transferError && (
+                            <p className="text-sm text-destructive mt-2">{transferError}</p>
+                          )}
+                        </div>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel onClick={handleTransferDialogClose} disabled={transferring}>
+                            Cancel
+                          </AlertDialogCancel>
+                          <Button
+                            onClick={handleTransferOwnership}
+                            disabled={transferring || !selectedNewOwner}
+                          >
+                            {transferring ? "Transferring..." : "Transfer Ownership"}
+                          </Button>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No other members to transfer ownership to. Invite members first.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {settings.isOwner && (
             <Card className="border-destructive/50">

@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useSession } from "next-auth/react"
+import Link from "next/link"
 import { Header } from "@/components/layout/header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -156,27 +157,29 @@ export default function SearchPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {results.map((game) => (
               <Card key={game.id} className="overflow-hidden">
-                <div className="aspect-[3/4] relative bg-muted">
-                  {game.coverUrl ? (
-                    <img
-                      src={game.coverUrl}
-                      alt={game.name}
-                      className="object-cover w-full h-full"
-                    />
-                  ) : (
-                    <div className="flex items-center justify-center w-full h-full text-muted-foreground">
-                      No Image
-                    </div>
-                  )}
-                </div>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg line-clamp-1">{game.name}</CardTitle>
-                  {game.firstReleaseDate && (
-                    <CardDescription>
-                      {new Date(game.firstReleaseDate).getFullYear()}
-                    </CardDescription>
-                  )}
-                </CardHeader>
+                <Link href={`/games/${game.id}`} className="block">
+                  <div className="aspect-[3/4] relative bg-muted">
+                    {game.coverUrl ? (
+                      <img
+                        src={game.coverUrl}
+                        alt={game.name}
+                        className="object-cover w-full h-full"
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center w-full h-full text-muted-foreground">
+                        No Image
+                      </div>
+                    )}
+                  </div>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg line-clamp-1 hover:text-primary">{game.name}</CardTitle>
+                    {game.firstReleaseDate && (
+                      <CardDescription>
+                        {new Date(game.firstReleaseDate).getFullYear()}
+                      </CardDescription>
+                    )}
+                  </CardHeader>
+                </Link>
                 <CardContent>
                   <Button
                     className="w-full"
