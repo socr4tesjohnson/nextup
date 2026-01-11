@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
+import bcrypt from "bcryptjs"
 import { authOptions } from "@/lib/auth/options"
 import { prisma } from "@/lib/db/prisma"
 
@@ -89,6 +90,39 @@ export async function DELETE(request: NextRequest) {
 
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    // Get the password from request body
+    const body = await request.json()
+    const { password } = body
+
+    if (!password) {
+      return NextResponse.json(
+        { error: "Password is required to delete your account" },
+        { status: 400 }
+      )
+    }
+
+    // Get user with password hash
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { passwordHash: true }
+    })
+
+    if (!user || !user.passwordHash) {
+      return NextResponse.json(
+        { error: "Cannot verify password for this account type" },
+        { status: 400 }
+      )
+    }
+
+    // Verify password
+    const isPasswordValid = await bcrypt.compare(password, user.passwordHash)
+    if (!isPasswordValid) {
+      return NextResponse.json(
+        { error: "Incorrect password" },
+        { status: 403 }
+      )
     }
 
     // Delete user (cascades to related records)
