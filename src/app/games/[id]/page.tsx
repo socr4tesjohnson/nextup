@@ -23,6 +23,17 @@ interface Game {
   rating: number | null
 }
 
+interface Deal {
+  id: string
+  store: string
+  price: number
+  msrp: number
+  discountPercent: number
+  url: string
+  isHistoricalLow: boolean
+  region: string
+}
+
 const STATUS_OPTIONS = [
   { value: "NOW_PLAYING", label: "Now Playing" },
   { value: "BACKLOG", label: "Backlog" },
@@ -40,6 +51,8 @@ export default function GameDetailPage() {
   const [game, setGame] = useState<Game | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [deals, setDeals] = useState<Deal[]>([])
+  const [dealsLoading, setDealsLoading] = useState(true)
 
   // Add to list modal state
   const [showAddModal, setShowAddModal] = useState(false)
@@ -70,7 +83,23 @@ export default function GameDetailPage() {
       }
     }
 
+    async function fetchDeals() {
+      try {
+        const response = await fetch(`/api/games/${gameId}/deals`)
+        const data = await response.json()
+
+        if (response.ok && data.deals) {
+          setDeals(data.deals)
+        }
+      } catch (err) {
+        console.error("Failed to load deals:", err)
+      } finally {
+        setDealsLoading(false)
+      }
+    }
+
     fetchGame()
+    fetchDeals()
   }, [gameId])
 
   const handleAddToList = async (e: React.FormEvent) => {
@@ -288,6 +317,57 @@ export default function GameDetailPage() {
                 </p>
               </div>
             )}
+
+            {/* Where to Buy Section */}
+            <div>
+              <h2 className="text-lg font-semibold mb-3">Where to Buy</h2>
+              {dealsLoading ? (
+                <div className="animate-pulse space-y-2">
+                  <div className="h-12 bg-muted rounded"></div>
+                  <div className="h-12 bg-muted rounded"></div>
+                  <div className="h-12 bg-muted rounded"></div>
+                </div>
+              ) : deals.length > 0 ? (
+                <div className="space-y-2">
+                  {deals.map((deal) => (
+                    <a
+                      key={deal.id}
+                      href={deal.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="font-medium">{deal.store}</span>
+                        {deal.isHistoricalLow && (
+                          <span className="text-xs px-2 py-0.5 rounded bg-green-500/20 text-green-600">
+                            Historical Low!
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {deal.discountPercent > 0 && (
+                          <span className="text-sm px-2 py-0.5 rounded bg-red-500/20 text-red-500 font-medium">
+                            -{deal.discountPercent}%
+                          </span>
+                        )}
+                        <div className="text-right">
+                          <span className="font-bold text-primary">${deal.price.toFixed(2)}</span>
+                          {deal.discountPercent > 0 && (
+                            <span className="ml-2 text-sm text-muted-foreground line-through">
+                              ${deal.msrp.toFixed(2)}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-muted-foreground">→</span>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground">No deals available for this game.</p>
+              )}
+            </div>
           </div>
         </div>
 

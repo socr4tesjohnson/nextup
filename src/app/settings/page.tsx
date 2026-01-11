@@ -9,6 +9,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
+interface DealPreferences {
+  enabled: boolean
+  region: string
+  platforms: string[]
+  stores: string[]
+  priceThreshold: number | null
+  notifyOn: Record<string, boolean>
+}
+
+const AVAILABLE_PLATFORMS = ["PC", "PlayStation 5", "PlayStation 4", "Xbox Series X|S", "Xbox One", "Nintendo Switch"]
+const AVAILABLE_STORES = ["Steam", "GOG", "Epic Games", "Humble Bundle", "Green Man Gaming", "PlayStation Store", "Xbox Store", "Nintendo eShop"]
+
 export default function SettingsPage() {
   const { data: session, update: updateSession } = useSession()
   const [name, setName] = useState("")
@@ -22,12 +34,41 @@ export default function SettingsPage() {
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState("")
 
+  // Deal preferences state
+  const [dealPrefs, setDealPrefs] = useState<DealPreferences>({
+    enabled: false,
+    region: "US",
+    platforms: [],
+    stores: [],
+    priceThreshold: null,
+    notifyOn: {}
+  })
+  const [savingDeals, setSavingDeals] = useState(false)
+  const [dealSuccessMessage, setDealSuccessMessage] = useState("")
+  const [dealErrorMessage, setDealErrorMessage] = useState("")
+
   // Initialize name from session
   useEffect(() => {
     if (session?.user?.name) {
       setName(session.user.name)
     }
   }, [session?.user?.name])
+
+  // Fetch deal preferences
+  useEffect(() => {
+    async function fetchDealPrefs() {
+      try {
+        const response = await fetch("/api/users/me/deals")
+        if (response.ok) {
+          const data = await response.json()
+          setDealPrefs(data.preferences)
+        }
+      } catch (error) {
+        console.error("Failed to fetch deal preferences:", error)
+      }
+    }
+    fetchDealPrefs()
+  }, [])
 
   const handleSignOut = () => {
     signOut({ callbackUrl: "/" })
@@ -109,6 +150,53 @@ export default function SettingsPage() {
     setDeleteError("")
   }
 
+  const handleSaveDealPrefs = async () => {
+    setSavingDeals(true)
+    setDealSuccessMessage("")
+    setDealErrorMessage("")
+
+    try {
+      const response = await fetch("/api/users/me/deals", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(dealPrefs),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || "Failed to save deal preferences")
+      }
+
+      setDealSuccessMessage("Deal preferences saved!")
+      setTimeout(() => setDealSuccessMessage(""), 3000)
+    } catch (error) {
+      setDealErrorMessage(error instanceof Error ? error.message : "Failed to save deal preferences")
+      setTimeout(() => setDealErrorMessage(""), 5000)
+    } finally {
+      setSavingDeals(false)
+    }
+  }
+
+  const togglePlatform = (platform: string) => {
+    setDealPrefs(prev => ({
+      ...prev,
+      platforms: prev.platforms.includes(platform)
+        ? prev.platforms.filter(p => p !== platform)
+        : [...prev.platforms, platform]
+    }))
+  }
+
+  const toggleStore = (store: string) => {
+    setDealPrefs(prev => ({
+      ...prev,
+      stores: prev.stores.includes(store)
+        ? prev.stores.filter(s => s !== store)
+        : [...prev.stores, store]
+    }))
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -153,6 +241,109 @@ export default function SettingsPage() {
               </div>
               <Button onClick={handleSaveProfile} disabled={saving}>
                 {saving ? "Saving..." : "Save Changes"}
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Deal Alerts</CardTitle>
+              <CardDescription>Get notified when games on your wishlist go on sale.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {dealSuccessMessage && (
+                <div className="p-3 text-sm text-green-800 bg-green-100 rounded-md">
+                  {dealSuccessMessage}
+                </div>
+              )}
+              {dealErrorMessage && (
+                <div className="p-3 text-sm text-red-800 bg-red-100 rounded-md">
+                  {dealErrorMessage}
+                </div>
+              )}
+
+              {/* Enable Deal Tracking */}
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="deal-enabled"
+                  checked={dealPrefs.enabled}
+                  onChange={(e) => setDealPrefs(prev => ({ ...prev, enabled: e.target.checked }))}
+                  className="w-4 h-4 rounded border-gray-300"
+                />
+                <Label htmlFor="deal-enabled" className="cursor-pointer">
+                  Enable deal tracking
+                </Label>
+              </div>
+
+              {/* Platforms */}
+              <div className="space-y-2">
+                <Label>Platforms</Label>
+                <div className="flex flex-wrap gap-2">
+                  {AVAILABLE_PLATFORMS.map((platform) => (
+                    <button
+                      key={platform}
+                      type="button"
+                      onClick={() => togglePlatform(platform)}
+                      className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${
+                        dealPrefs.platforms.includes(platform)
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-background border-input hover:bg-accent"
+                      }`}
+                    >
+                      {platform}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Stores */}
+              <div className="space-y-2">
+                <Label>Stores</Label>
+                <div className="flex flex-wrap gap-2">
+                  {AVAILABLE_STORES.map((store) => (
+                    <button
+                      key={store}
+                      type="button"
+                      onClick={() => toggleStore(store)}
+                      className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${
+                        dealPrefs.stores.includes(store)
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-background border-input hover:bg-accent"
+                      }`}
+                    >
+                      {store}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Price Threshold */}
+              <div className="space-y-2">
+                <Label htmlFor="price-threshold">Price Threshold (optional)</Label>
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground">$</span>
+                  <Input
+                    id="price-threshold"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="e.g., 20.00"
+                    value={dealPrefs.priceThreshold ?? ""}
+                    onChange={(e) => setDealPrefs(prev => ({
+                      ...prev,
+                      priceThreshold: e.target.value ? parseFloat(e.target.value) : null
+                    }))}
+                    className="w-32"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Only notify for deals below this price. Leave empty for all deals.
+                </p>
+              </div>
+
+              <Button onClick={handleSaveDealPrefs} disabled={savingDeals}>
+                {savingDeals ? "Saving..." : "Save Deal Preferences"}
               </Button>
             </CardContent>
           </Card>

@@ -113,10 +113,25 @@ export async function GET(
       take: 10
     })
 
+    // Parse platforms JSON for each entry
+    const parseGamePlatforms = (entry: any) => ({
+      ...entry,
+      game: {
+        ...entry.game,
+        platforms: entry.game.platforms ? JSON.parse(entry.game.platforms) : []
+      }
+    })
+
     return NextResponse.json({
-      nowPlaying,
-      mostWanted,
-      recentlyAdded
+      nowPlaying: nowPlaying.map(parseGamePlatforms),
+      mostWanted: mostWanted.map(item => ({
+        ...item,
+        game: {
+          ...item.game,
+          platforms: item.game.platforms ? JSON.parse(item.game.platforms) : []
+        }
+      })),
+      recentlyAdded: recentlyAdded.map(parseGamePlatforms)
     })
   } catch (error) {
     console.error("Error fetching group dashboard:", error)

@@ -56,6 +56,7 @@ interface GameEntry {
     name: string
     coverUrl: string | null
     firstReleaseDate: string | null
+    platforms?: string[]
   }
   user: {
     id: string
@@ -88,6 +89,21 @@ interface DashboardData {
   recentlyAdded: GameEntry[]
 }
 
+interface Recommendation {
+  id: string
+  score: number
+  reason: string
+  recommendationType: string
+  game: {
+    id: string
+    name: string
+    coverUrl: string | null
+    firstReleaseDate: string | null
+    platforms: string[]
+    genres: string[]
+  }
+}
+
 export default function GroupDetailPage() {
   const { data: session, status } = useSession()
   const params = useParams()
@@ -103,6 +119,25 @@ export default function GroupDetailPage() {
   const [memberToRemove, setMemberToRemove] = useState<GroupMember | null>(null)
   const [removingMember, setRemovingMember] = useState(false)
   const [selectedGame, setSelectedGame] = useState<{ id: string; name: string; coverUrl: string | null } | null>(null)
+  const [platformFilter, setPlatformFilter] = useState<string>("all")
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([])
+  const [dismissingRec, setDismissingRec] = useState<string | null>(null)
+
+  // Available platforms for filtering
+  const platforms = ["all", "PC", "PlayStation 5", "PlayStation 4", "Xbox Series X|S", "Xbox One", "Nintendo Switch", "Steam Deck", "Mobile"]
+
+  // Filter entries by platform
+  const filterByPlatform = (entries: GameEntry[]) => {
+    if (platformFilter === "all") return entries
+    return entries.filter(entry => {
+      // Check if the game has the platform in its platforms array
+      const gamePlatforms = entry.game.platforms || []
+      return gamePlatforms.some((p: string) =>
+        p.toLowerCase().includes(platformFilter.toLowerCase()) ||
+        platformFilter.toLowerCase().includes(p.toLowerCase())
+      )
+    })
+  }
 
   // Get all members' entries for a specific game
   const getMemberEntriesForGame = (gameId: string) => {
@@ -123,14 +158,16 @@ export default function GroupDetailPage() {
 
     async function fetchData() {
       try {
-        // Fetch group details and dashboard data in parallel
-        const [groupRes, dashboardRes] = await Promise.all([
+        // Fetch group details, dashboard data, and recommendations in parallel
+        const [groupRes, dashboardRes, recsRes] = await Promise.all([
           fetch(`/api/groups/${groupId}`),
-          fetch(`/api/groups/${groupId}/dashboard`)
+          fetch(`/api/groups/${groupId}/dashboard`),
+          fetch(`/api/groups/${groupId}/recommendations`)
         ])
 
         const groupData = await groupRes.json()
         const dashboardData = await dashboardRes.json()
+        const recsData = await recsRes.json()
 
         if (!groupRes.ok) {
           setError(groupData.error || "Failed to load group")
@@ -141,6 +178,10 @@ export default function GroupDetailPage() {
 
         if (dashboardRes.ok) {
           setDashboard(dashboardData)
+        }
+
+        if (recsRes.ok && recsData.recommendations) {
+          setRecommendations(recsData.recommendations)
         }
       } catch (err) {
         setError("Failed to load group")
@@ -196,6 +237,27 @@ export default function GroupDetailPage() {
     } finally {
       setRemovingMember(false)
       setMemberToRemove(null)
+    }
+  }
+
+  const handleDismissRecommendation = async (recId: string) => {
+    setDismissingRec(recId)
+    try {
+      const res = await fetch(`/api/groups/${groupId}/recommendations/${recId}`, {
+        method: "POST",
+      })
+
+      if (res.ok) {
+        // Remove from local state
+        setRecommendations(prev => prev.filter(rec => rec.id !== recId))
+      } else {
+        const data = await res.json()
+        setError(data.error || "Failed to dismiss recommendation")
+      }
+    } catch (err) {
+      setError("Failed to dismiss recommendation")
+    } finally {
+      setDismissingRec(null)
     }
   }
 
@@ -319,6 +381,25 @@ export default function GroupDetailPage() {
           </div>
         </div>
 
+        {/* Platform Filter */}
+        <div className="flex items-center gap-4 mb-6">
+          <label htmlFor="platform-filter" className="text-sm font-medium">
+            Filter by Platform:
+          </label>
+          <select
+            id="platform-filter"
+            value={platformFilter}
+            onChange={(e) => setPlatformFilter(e.target.value)}
+            className="p-2 border rounded-md bg-background text-sm"
+          >
+            {platforms.map((platform) => (
+              <option key={platform} value={platform}>
+                {platform === "all" ? "All Platforms" : platform}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Now Playing Section */}
           <Card className="lg:col-span-2">
@@ -327,9 +408,9 @@ export default function GroupDetailPage() {
               <CardDescription>Games members are currently playing</CardDescription>
             </CardHeader>
             <CardContent>
-              {dashboard?.nowPlaying && dashboard.nowPlaying.length > 0 ? (
+              {dashboard?.nowPlaying && filterByPlatform(dashboard.nowPlaying).length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {dashboard.nowPlaying.map((entry) => (
+                  {filterByPlatform(dashboard.nowPlaying).map((entry) => (
                     <div
                       key={entry.id}
                       className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted/80 transition-colors"
@@ -361,7 +442,11 @@ export default function GroupDetailPage() {
                   ))}
                 </div>
               ) : (
-                <p className="text-muted-foreground">No one is playing anything yet.</p>
+                <p className="text-muted-foreground">
+                  {platformFilter === "all"
+                    ? "No one is playing anything yet."
+                    : `No games for ${platformFilter} platform.`}
+                </p>
               )}
             </CardContent>
           </Card>
@@ -560,6 +645,61 @@ export default function GroupDetailPage() {
                 </div>
               ) : (
                 <p className="text-muted-foreground">No games have been added yet.</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Upcoming Radar Section */}
+          <Card className="lg:col-span-3">
+            <CardHeader>
+              <CardTitle>Upcoming Radar</CardTitle>
+              <CardDescription>Game recommendations based on your group's interests</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {recommendations.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {recommendations.map((rec) => (
+                    <div key={rec.id} className="relative flex items-start gap-3 p-3 rounded-lg bg-muted/50">
+                      <button
+                        onClick={() => handleDismissRecommendation(rec.id)}
+                        disabled={dismissingRec === rec.id}
+                        className="absolute top-2 right-2 w-6 h-6 rounded-full bg-background/80 hover:bg-destructive hover:text-destructive-foreground flex items-center justify-center text-muted-foreground transition-colors"
+                        title="Dismiss recommendation"
+                      >
+                        {dismissingRec === rec.id ? (
+                          <span className="animate-spin">⋯</span>
+                        ) : (
+                          "×"
+                        )}
+                      </button>
+                      {rec.game.coverUrl ? (
+                        <img
+                          src={rec.game.coverUrl}
+                          alt={rec.game.name}
+                          className="w-12 h-16 object-cover rounded"
+                        />
+                      ) : (
+                        <div className="w-12 h-16 bg-muted rounded flex items-center justify-center text-xs text-muted-foreground">
+                          No img
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0 pr-6">
+                        <p className="font-medium truncate">{rec.game.name}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{rec.reason}</p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className="text-xs px-2 py-0.5 rounded bg-primary/10 text-primary">
+                            {Math.round(rec.score * 100)}% match
+                          </span>
+                          <span className="text-xs text-muted-foreground capitalize">
+                            {rec.recommendationType.toLowerCase().replace("_", " ")}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground">No recommendations yet. Add more games to your lists to get personalized recommendations!</p>
               )}
             </CardContent>
           </Card>
