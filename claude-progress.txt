@@ -1,8 +1,8 @@
 # NextUp Development Progress
 
-## Last Updated: Session 6
+## Last Updated: Session 7
 
-## Current Status: 50/155 features passing (32.3%)
+## Current Status: 72/155 features passing (46.5%)
 
 ## Completed Features
 
@@ -27,67 +27,72 @@
 - Delete item removes from search results
 
 ### Session 6: Features #46-51
+- Duplicate email rejected on registration
+- Successful save shows feedback
+- Toast notifications auto-dismiss
+- Desktop layout at 1920px width
+- Tablet layout at 768px width
+- Mobile layout at 375px width (hamburger menu)
 
-#### Feature #46: Duplicate email rejected on registration - PASSING
-- Registered user with test@test.com
-- Attempted to register same email again
-- Verified error message "A user with this email already exists"
+### Session 7: Features #73-75
 
-#### Feature #47: Successful save shows feedback - PASSING
-- Added success message state to My Lists page
-- Shows green toast "Game updated successfully!" after edit
-- Auto-dismisses after 3 seconds
-- Search page already had success message for adding games
+#### Feature #73: Profile management works - PASSING
+- Settings page now has working profile update functionality
+- Display Name can be edited and saved
+- API PATCH /api/users/me updates database
+- Session is updated to reflect new name immediately
+- Success message "Profile updated successfully!" shown
+- Name persists across page refreshes and re-login
 
-#### Feature #48: Toast notifications auto-dismiss - PASSING
-- Verified toast messages disappear after 3 seconds
-- Tested by adding game and waiting for message to fade
+#### Feature #74: Account deletion with confirmation - PASSING
+- Added confirmation dialog when clicking "Delete Account"
+- Dialog requires password entry to proceed
+- Incorrect password shows error message
+- Correct password deletes account and redirects to home
+- Deleted account cannot login (verified)
+- Updated API DELETE /api/users/me to require and verify password
 
-#### Feature #49: Desktop layout at 1920px width - PASSING
-- Verified navigation visible and not collapsed
-- Content uses appropriate width with margins
-- No horizontal scroll
-- Screenshots captured
-
-#### Feature #50: Tablet layout at 768px width - PASSING
-- Verified navigation adapts appropriately
-- Content is readable
-- Game cards reflow to 2 columns
-- Screenshots captured
-
-#### Feature #51: Mobile layout at 375px width - PASSING
-- Implemented hamburger menu for mobile navigation
-- Menu toggles with X icon when open
-- Navigation dropdown shows all links
-- No horizontal scroll
-- Touch targets are adequate size
+#### Feature #75: Generate shareable invite link - PASSING
+- Group settings page has "Invite Link" section
+- Shows current invite code
+- "Regenerate Code" button creates new code
+- Success message "Invite code regenerated" shown
+- "Copy" button copies code to clipboard
+- Success message "Invite code copied!" shown
 
 ## Code Changes This Session
 
-### My Lists Page (src/app/me/page.tsx)
-- Added successMessage state
-- Added success toast display after saving edits
-- Auto-dismiss after 3 seconds with setTimeout
+### Settings Page (src/app/settings/page.tsx)
+- Added state management for profile editing (name, saving, success/error)
+- Connected Save Changes button to PATCH /api/users/me
+- Added delete account confirmation dialog
+- Dialog requires password and shows error on incorrect password
+- Calls DELETE /api/users/me with password verification
 
-### Header Component (src/components/layout/header.tsx)
-- Added useState import and mobileMenuOpen state
-- Added hamburger menu button (visible on mobile only)
-- Icon toggles between 3-line menu and X close icon
-- Added mobile navigation dropdown menu
-- Menu auto-closes when link is clicked
+### User API (src/app/api/users/me/route.ts)
+- Updated DELETE endpoint to require password in request body
+- Added bcrypt password verification before deleting
+- Returns 403 "Incorrect password" on failed verification
+
+### Auth Options (src/lib/auth/options.ts)
+- Updated JWT callback to handle session updates (trigger === "update")
+- Session name now properly updates when profile is changed
+- Fixed session refresh to show updated name immediately
 
 ## Test Users
 - test@example.com / testpass123 (Test User) - Group owner
 - second@example.com / testpass123 (Second User) - Group member
 - test@test.com / testpass123 (Test Duplicate) - Created for feature #46
+- deletetest@example.com - DELETED (used to test account deletion)
 
 ## Server
-- Development server: http://localhost:3002 (port may vary)
+- Development server: http://localhost:3000
 - Start with: npm run dev --prefix /g/Projects/NextUp
 
 ## Database
 - SQLite: prisma/dev.db
 
 ## What To Work On Next
-- Feature #52 and beyond
-- Continue with remaining style and functional features
+- Feature #76 and beyond
+- Continue with remaining functional features
+- Current progress: 72/155 (46.5%)
