@@ -7,6 +7,7 @@ import { Header } from "@/components/layout/header"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
+import { Pagination } from "@/components/ui/pagination"
 
 interface GameEntry {
   id: string
@@ -33,6 +34,15 @@ const STATUS_LABELS: Record<string, string> = {
   FINISHED: "Finished",
   DROPPED: "Dropped",
   FAVORITE: "Favorite",
+}
+
+const STATUS_COLORS: Record<string, string> = {
+  NOW_PLAYING: "bg-blue-500 text-white",
+  BACKLOG: "bg-amber-500 text-white",
+  WISHLIST: "bg-purple-500 text-white",
+  FINISHED: "bg-green-500 text-white",
+  DROPPED: "bg-gray-500 text-white",
+  FAVORITE: "bg-pink-500 text-white",
 }
 
 // Format timestamp for display
@@ -83,6 +93,12 @@ export default function MyListsPage() {
   const [sort, setSort] = useState("date_desc")
   const [error, setError] = useState("")
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const ITEMS_PER_PAGE = 12
+
   // Edit modal state
   const [showEditModal, setShowEditModal] = useState(false)
   const [editingEntry, setEditingEntry] = useState<GameEntry | null>(null)
@@ -114,14 +130,23 @@ export default function MyListsPage() {
 
     async function fetchEntries() {
       try {
-        const url = filter
-          ? `/api/lists?status=${encodeURIComponent(filter)}`
-          : "/api/lists"
+        setLoading(true)
+        const params = new URLSearchParams()
+        params.set("page", currentPage.toString())
+        params.set("limit", ITEMS_PER_PAGE.toString())
+        if (filter) {
+          params.set("status", filter)
+        }
+        const url = `/api/lists?${params.toString()}`
         const response = await fetch(url)
         const data = await response.json()
 
         if (response.ok) {
           setEntries(data.entries || [])
+          if (data.pagination) {
+            setTotalPages(data.pagination.totalPages)
+            setTotalCount(data.pagination.totalCount)
+          }
         } else {
           setError(data.error || "Failed to load entries")
         }
@@ -134,7 +159,18 @@ export default function MyListsPage() {
     }
 
     fetchEntries()
-  }, [sessionStatus, filter])
+  }, [sessionStatus, filter, currentPage])
+
+  // Reset to page 1 when filter changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [filter])
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+    // Scroll to top of the page
+    window.scrollTo({ top: 0, behavior: "smooth" })
+  }
 
   // Sort entries based on current sort option
   const sortedEntries = [...entries].sort((a, b) => {
@@ -398,93 +434,109 @@ export default function MyListsPage() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {sortedEntries.map((entry) => (
-              <Card key={entry.id} className="overflow-hidden">
-                <div className="aspect-[3/4] relative bg-muted">
-                  {entry.game.coverUrl ? (
-                    <img
-                      src={entry.game.coverUrl}
-                      alt={entry.game.name}
-                      className="object-cover w-full h-full"
-                    />
-                  ) : (
-                    <div className="flex items-center justify-center w-full h-full text-muted-foreground">
-                      No Image
-                    </div>
-                  )}
-                  <div className="absolute top-2 right-2 px-2 py-1 bg-primary text-primary-foreground rounded text-xs font-medium">
-                    {STATUS_LABELS[entry.status] || entry.status}
-                  </div>
-                </div>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg line-clamp-1">
-                    {entry.game.name}
-                  </CardTitle>
-                  {entry.game.firstReleaseDate && (
-                    <CardDescription>
-                      {new Date(entry.game.firstReleaseDate).getFullYear()}
-                    </CardDescription>
-                  )}
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {entry.notes && (
-                    <p className="text-sm text-muted-foreground line-clamp-2">
-                      {entry.notes}
-                    </p>
-                  )}
-                  {entry.rating && (
-                    <p className="text-sm">
-                      Rating: {entry.rating}/10
-                    </p>
-                  )}
-                  {entry.platform && (
-                    <p className="text-sm text-muted-foreground">
-                      Platform: {entry.platform}
-                    </p>
-                  )}
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Label htmlFor={`quick-status-${entry.id}`} className="text-sm whitespace-nowrap">
-                        Status:
-                      </Label>
-                      <select
-                        id={`quick-status-${entry.id}`}
-                        value={entry.status}
-                        onChange={(e) => handleQuickStatusChange(entry.id, e.target.value)}
-                        className="flex-1 p-1.5 text-sm border rounded-md bg-background"
-                        aria-label="Quick status change"
-                      >
-                        {STATUS_OPTIONS.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1"
-                        onClick={() => openEditModal(entry)}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1"
-                        onClick={() => handleDelete(entry.id)}
-                      >
-                        Remove
-                      </Button>
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {sortedEntries.map((entry) => (
+                <Card key={entry.id} className="overflow-hidden">
+                  <div className="aspect-[3/4] relative bg-muted">
+                    {entry.game.coverUrl ? (
+                      <img
+                        src={entry.game.coverUrl}
+                        alt={entry.game.name}
+                        className="object-cover w-full h-full"
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center w-full h-full text-muted-foreground">
+                        No Image
+                      </div>
+                    )}
+                    <div className={`absolute top-2 right-2 px-2 py-1 rounded text-xs font-medium ${STATUS_COLORS[entry.status] || "bg-primary text-primary-foreground"}`}>
+                      {STATUS_LABELS[entry.status] || entry.status}
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg line-clamp-1">
+                      {entry.game.name}
+                    </CardTitle>
+                    {entry.game.firstReleaseDate && (
+                      <CardDescription>
+                        {new Date(entry.game.firstReleaseDate).getFullYear()}
+                      </CardDescription>
+                    )}
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {entry.notes && (
+                      <p className="text-sm text-muted-foreground line-clamp-2">
+                        {entry.notes}
+                      </p>
+                    )}
+                    {entry.rating && (
+                      <p className="text-sm">
+                        Rating: {entry.rating}/10
+                      </p>
+                    )}
+                    {entry.platform && (
+                      <p className="text-sm text-muted-foreground">
+                        Platform: {entry.platform}
+                      </p>
+                    )}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor={`quick-status-${entry.id}`} className="text-sm whitespace-nowrap">
+                          Status:
+                        </Label>
+                        <select
+                          id={`quick-status-${entry.id}`}
+                          value={entry.status}
+                          onChange={(e) => handleQuickStatusChange(entry.id, e.target.value)}
+                          className="flex-1 p-1.5 text-sm border rounded-md bg-background"
+                          aria-label="Quick status change"
+                        >
+                          {STATUS_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => openEditModal(entry)}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => handleDelete(entry.id)}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="mt-8 flex flex-col items-center gap-2">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={handlePageChange}
+                />
+                <p className="text-sm text-muted-foreground">
+                  Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, totalCount)} of {totalCount} games
+                </p>
+              </div>
+            )}
+          </>
         )}
 
         {/* Edit Modal */}

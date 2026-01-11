@@ -14,11 +14,18 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const status = searchParams.get("status")
+    const page = parseInt(searchParams.get("page") || "1", 10)
+    const limit = parseInt(searchParams.get("limit") || "12", 10)
+    const skip = (page - 1) * limit
 
     const where: any = { userId: session.user.id }
     if (status) {
       where.status = status
     }
+
+    // Get total count for pagination
+    const totalCount = await prisma.userGameEntry.count({ where })
+    const totalPages = Math.ceil(totalCount / limit)
 
     const entries = await prisma.userGameEntry.findMany({
       where,
@@ -28,10 +35,20 @@ export async function GET(request: NextRequest) {
           select: { id: true, name: true }
         }
       },
-      orderBy: { updatedAt: "desc" }
+      orderBy: { updatedAt: "desc" },
+      skip,
+      take: limit,
     })
 
-    return NextResponse.json({ entries })
+    return NextResponse.json({
+      entries,
+      pagination: {
+        page,
+        limit,
+        totalCount,
+        totalPages,
+      }
+    })
   } catch (error) {
     console.error("Error fetching list entries:", error)
     return NextResponse.json(
