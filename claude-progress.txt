@@ -1,8 +1,8 @@
 # NextUp Development Progress
 
-## Last Updated: Session 7
+## Last Updated: Session 8
 
-## Current Status: 72/155 features passing (46.5%)
+## Current Status: 83/155 features passing (53.5%)
 
 ## Completed Features
 
@@ -35,64 +35,87 @@
 - Mobile layout at 375px width (hamburger menu)
 
 ### Session 7: Features #73-75
+- Profile management works
+- Account deletion with confirmation
+- Generate shareable invite link
 
-#### Feature #73: Profile management works - PASSING
-- Settings page now has working profile update functionality
-- Display Name can be edited and saved
-- API PATCH /api/users/me updates database
-- Session is updated to reflect new name immediately
-- Success message "Profile updated successfully!" shown
-- Name persists across page refreshes and re-login
+### Session 8: Features #81-86
 
-#### Feature #74: Account deletion with confirmation - PASSING
-- Added confirmation dialog when clicking "Delete Account"
-- Dialog requires password entry to proceed
-- Incorrect password shows error message
-- Correct password deletes account and redirects to home
-- Deleted account cannot login (verified)
-- Updated API DELETE /api/users/me to require and verify password
+#### Feature #81: Game caching works - PASSING
+- Implemented in-memory cache with TTL support
+- Search results cached for 5 minutes
+- Game details cached for 24 hours
+- Cache HIT/MISS logged to console
+- Verified faster response on repeat searches
 
-#### Feature #75: Generate shareable invite link - PASSING
-- Group settings page has "Invite Link" section
-- Shows current invite code
-- "Regenerate Code" button creates new code
-- Success message "Invite code regenerated" shown
-- "Copy" button copies code to clipboard
-- Success message "Invite code copied!" shown
+#### Feature #82: Add game to list saves to database - PASSING
+- Game upsert on add creates database record
+- Games have internal UUIDs
+- Other users can see same game in shared context
+- Verified by searching as different user
+
+#### Feature #83: Now Playing section shows correct games - PASSING
+- Group dashboard shows Now Playing games
+- User avatars displayed next to games
+- Real-time data from group members
+
+#### Feature #84: Most Wanted section aggregates wishlists - PASSING
+- Wishlisted games aggregated by vote count
+- Shows "X people want this" for multiple users
+- Verified by adding same game to wishlist from two users
+
+#### Feature #85: Recently Added shows latest entries - PASSING
+- Recent entries sorted by createdAt desc
+- New additions appear at top
+- Shows user who added and status
+
+#### Feature #86: Click game shows member statuses - PASSING
+- Added clickable game cards in Now Playing
+- Modal shows all members who have the game
+- Each member's status displayed (Now Playing, Finished, etc.)
+- Close button to dismiss modal
 
 ## Code Changes This Session
 
-### Settings Page (src/app/settings/page.tsx)
-- Added state management for profile editing (name, saving, success/error)
-- Connected Save Changes button to PATCH /api/users/me
-- Added delete account confirmation dialog
-- Dialog requires password and shows error on incorrect password
-- Calls DELETE /api/users/me with password verification
+### New Files
+- src/lib/cache.ts - In-memory cache with TTL support
+  - Cache key generators
+  - TTL values (5min search, 24hr details)
+  - Automatic cleanup of expired entries
 
-### User API (src/app/api/users/me/route.ts)
-- Updated DELETE endpoint to require password in request body
-- Added bcrypt password verification before deleting
-- Returns 403 "Incorrect password" on failed verification
+### Modified Files
+- src/app/api/games/search/route.ts
+  - Added cache check before database query
+  - Cache results after successful search
+  - Returns cached: true/false in response
 
-### Auth Options (src/lib/auth/options.ts)
-- Updated JWT callback to handle session updates (trigger === "update")
-- Session name now properly updates when profile is changed
-- Fixed session refresh to show updated name immediately
+- src/app/api/games/[id]/route.ts
+  - Added cache for game details
+  - 24-hour TTL for game info
+
+- src/app/groups/[id]/page.tsx
+  - Made game cards clickable in Now Playing
+  - Added Game Details Modal
+  - Shows all members with game and their status
 
 ## Test Users
 - test@example.com / testpass123 (Test User) - Group owner
-- second@example.com / testpass123 (Second User) - Group member
-- test@test.com / testpass123 (Test Duplicate) - Created for feature #46
-- deletetest@example.com - DELETED (used to test account deletion)
+- second@example.com / testpass123 (Second User) - Group member/admin
 
 ## Server
-- Development server: http://localhost:3000
-- Start with: npm run dev --prefix /g/Projects/NextUp
+- Development server: http://localhost:3001 (port 3000 in use)
+- Start with: npm run dev
 
 ## Database
 - SQLite: prisma/dev.db
 
 ## What To Work On Next
-- Feature #76 and beyond
+- Feature #87 and beyond
 - Continue with remaining functional features
-- Current progress: 72/155 (46.5%)
+- Current progress: 83/155 (53.5%)
+- Over halfway complete!
+
+## Architecture Notes
+- Using in-memory cache (can be upgraded to Redis for production)
+- Cache keys use patterns like "game:search:{query}" and "game:detail:{id}"
+- Group dashboard aggregates data from all member entries
