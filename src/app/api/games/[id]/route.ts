@@ -52,7 +52,7 @@ export async function GET(
 
     console.log(`[Cache MISS] Game detail: "${gameId}"`)
 
-    // Use raw query to get all fields including gameModes and playerCount
+    // Use raw query to get all fields including gameModes, playerCount, and videos
     // This bypasses any Prisma client caching issues
     const games = await prisma.$queryRaw<Array<{
       id: string
@@ -67,10 +67,11 @@ export async function GET(
       themes: string
       gameModes: string
       playerCount: string | null
+      videos: string
       rating: number | null
     }>>`
       SELECT id, name, slug, description, coverUrl, bannerUrl, firstReleaseDate,
-             genres, platforms, themes, gameModes, playerCount, rating
+             genres, platforms, themes, gameModes, playerCount, videos, rating
       FROM Game
       WHERE id = ${gameId}
       LIMIT 1
@@ -95,6 +96,7 @@ export async function GET(
       themes: game.themes ? JSON.parse(game.themes) : [],
       gameModes: game.gameModes ? JSON.parse(game.gameModes) : [],
       playerCount: game.playerCount,
+      videos: game.videos ? JSON.parse(game.videos) : [],
       rating: game.rating
     }
 

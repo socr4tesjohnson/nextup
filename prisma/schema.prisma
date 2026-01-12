@@ -138,6 +138,7 @@ model Game {
   themes           String    @default("[]")
   gameModes        String    @default("[]")  // ["Single player", "Multiplayer", "Co-op", etc.]
   playerCount      String?                    // e.g., "1", "1-4", "2-8 online"
+  videos           String    @default("[]")  // JSON array of {name, youtubeId} for game trailers
   rating           Float?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt

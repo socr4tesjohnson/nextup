@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth/options"
 import { prisma } from "@/lib/db/prisma"
 import { cache, cacheKeys, cacheTTL } from "@/lib/cache"
+import { searchGames as searchITAD, getGameInfo as getITADGameInfo } from "@/lib/api/itad"
 
 // Simple in-memory rate limiter (per user)
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>()
@@ -29,6 +30,7 @@ function checkRateLimit(userId: string): { limited: boolean; retryAfter?: number
 }
 
 // Sample game data for testing - later will integrate with IGDB API
+// Videos are stored as JSON array of {name, youtubeId} objects
 const sampleGames = [
   {
     provider: "IGDB",
@@ -41,6 +43,10 @@ const sampleGames = [
     platforms: JSON.stringify(["PC", "PlayStation 4", "Xbox One", "Nintendo Switch"]),
     gameModes: JSON.stringify(["Single player"]),
     playerCount: "1",
+    videos: JSON.stringify([
+      { name: "Official Launch Trailer", youtubeId: "c0i88t0Kacs" },
+      { name: "The Sword of Destiny Trailer", youtubeId: "HtVdAasjOgU" }
+    ]),
     description: "The Witcher 3: Wild Hunt is a story-driven open world RPG set in a visually stunning fantasy universe full of meaningful choices and impactful consequences."
   },
   {
@@ -54,6 +60,10 @@ const sampleGames = [
     platforms: JSON.stringify(["Nintendo Switch", "Wii U"]),
     gameModes: JSON.stringify(["Single player"]),
     playerCount: "1",
+    videos: JSON.stringify([
+      { name: "Nintendo Switch Presentation Trailer", youtubeId: "zw47_q9wbBE" },
+      { name: "Life in the Ruins", youtubeId: "1rPxiXXxftE" }
+    ]),
     description: "Step into a world of discovery, exploration, and adventure in The Legend of Zelda: Breath of the Wild."
   },
   {
@@ -67,6 +77,10 @@ const sampleGames = [
     platforms: JSON.stringify(["PC", "PlayStation 5", "Xbox Series X"]),
     gameModes: JSON.stringify(["Single player", "Multiplayer", "Co-op"]),
     playerCount: "1-4 online",
+    videos: JSON.stringify([
+      { name: "Official Launch Trailer", youtubeId: "qqiC88f9ogU" },
+      { name: "Official Gameplay Reveal", youtubeId: "JldMvQMO_5U" }
+    ]),
     description: "Elden Ring is an action RPG developed by FromSoftware and published by Bandai Namco Entertainment."
   },
   {
@@ -80,6 +94,10 @@ const sampleGames = [
     platforms: JSON.stringify(["PC", "PlayStation 5", "Xbox Series X"]),
     gameModes: JSON.stringify(["Single player", "Multiplayer", "Co-op"]),
     playerCount: "1-4",
+    videos: JSON.stringify([
+      { name: "Launch Cinematic Trailer", youtubeId: "XuCfkgaaa08" },
+      { name: "Official Release Trailer", youtubeId: "XWqP6aTxrpc" }
+    ]),
     description: "An epic RPG from Larian Studios, set in the Dungeons & Dragons universe."
   },
   {
@@ -93,6 +111,10 @@ const sampleGames = [
     platforms: JSON.stringify(["PC", "Nintendo Switch", "PlayStation", "Xbox"]),
     gameModes: JSON.stringify(["Single player"]),
     playerCount: "1",
+    videos: JSON.stringify([
+      { name: "v1.0 Launch Trailer", youtubeId: "91t0ha9x0AE" },
+      { name: "Animated Trailer", youtubeId: "Bz8l935Bv0Y" }
+    ]),
     description: "Defy the god of the dead as you hack and slash out of the Underworld in this rogue-like dungeon crawler."
   },
   {
@@ -106,6 +128,10 @@ const sampleGames = [
     platforms: JSON.stringify(["PC", "Nintendo Switch", "PlayStation", "Xbox"]),
     gameModes: JSON.stringify(["Single player"]),
     playerCount: "1",
+    videos: JSON.stringify([
+      { name: "Official Trailer", youtubeId: "UAO2urG23S4" },
+      { name: "Nintendo Switch Trailer", youtubeId: "kWo5g-tsBNk" }
+    ]),
     description: "Forge your own path in Hollow Knight! An epic action adventure through a vast ruined kingdom of insects and heroes."
   },
   {
@@ -119,6 +145,9 @@ const sampleGames = [
     platforms: JSON.stringify(["PC", "Nintendo Switch", "PlayStation", "Xbox"]),
     gameModes: JSON.stringify(["Single player"]),
     playerCount: "1",
+    videos: JSON.stringify([
+      { name: "Launch Trailer", youtubeId: "iofYDsA2rqg" }
+    ]),
     description: "Help Madeline survive her inner demons on her journey to the top of Celeste Mountain."
   },
   {
@@ -132,6 +161,10 @@ const sampleGames = [
     platforms: JSON.stringify(["PlayStation 4", "PlayStation 5"]),
     gameModes: JSON.stringify(["Single player"]),
     playerCount: "1",
+    videos: JSON.stringify([
+      { name: "Launch Trailer", youtubeId: "hfJ4Km46A-0" },
+      { name: "Father and Son Cinematic Trailer", youtubeId: "EE-4GvjKcfs" }
+    ]),
     description: "Embark on a mythic journey for answers and allies before Ragnarök arrives."
   },
   {
@@ -145,6 +178,10 @@ const sampleGames = [
     platforms: JSON.stringify(["PC", "Nintendo Switch", "PlayStation", "Xbox", "Mobile"]),
     gameModes: JSON.stringify(["Single player", "Multiplayer", "Co-op"]),
     playerCount: "1-4",
+    videos: JSON.stringify([
+      { name: "Official Trailer", youtubeId: "ot7uXNQskhs" },
+      { name: "Multiplayer Update Trailer", youtubeId: "AtL6X-4W0P8" }
+    ]),
     description: "You've inherited your grandfather's old farm plot in Stardew Valley."
   }
 ]
@@ -227,7 +264,76 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ games, cached: false })
     }
 
-    // Search sample data and upsert to database
+    // Try searching ITAD API first for better results
+    console.log(`[ITAD] Searching for: "${query}"`)
+    const itadResults = await searchITAD(query, 20)
+
+    if (itadResults && itadResults.length > 0) {
+      console.log(`[ITAD] Found ${itadResults.length} results`)
+
+      // Create games in database from ITAD results
+      const games = await Promise.all(
+        itadResults.slice(0, 20).map(async (itadGame) => {
+          // Get additional info from ITAD
+          const gameInfo = await getITADGameInfo(itadGame.id)
+
+          const gameData = {
+            provider: "ITAD",
+            providerGameId: itadGame.id,
+            name: itadGame.title,
+            slug: itadGame.slug,
+            coverUrl: gameInfo?.assets?.boxart || gameInfo?.assets?.banner400 || null,
+            bannerUrl: gameInfo?.assets?.banner600 || null,
+            firstReleaseDate: gameInfo?.released ? new Date(gameInfo.released) : null,
+            genres: JSON.stringify(gameInfo?.tags?.slice(0, 5) || []),
+            platforms: JSON.stringify(["PC"]), // ITAD primarily tracks PC games
+            gameModes: JSON.stringify([]),
+            playerCount: null,
+            videos: JSON.stringify([]),
+            description: null
+          }
+
+          // Upsert to database
+          const game = await prisma.game.upsert({
+            where: {
+              provider_providerGameId: {
+                provider: gameData.provider,
+                providerGameId: gameData.providerGameId
+              }
+            },
+            update: {
+              name: gameData.name,
+              coverUrl: gameData.coverUrl,
+              bannerUrl: gameData.bannerUrl,
+              firstReleaseDate: gameData.firstReleaseDate,
+              genres: gameData.genres
+            },
+            create: gameData
+          })
+
+          return {
+            id: game.id,
+            providerGameId: game.providerGameId,
+            name: game.name,
+            coverUrl: game.coverUrl,
+            firstReleaseDate: game.firstReleaseDate,
+            genres: game.genres ? JSON.parse(game.genres) : [],
+            platforms: game.platforms ? JSON.parse(game.platforms) : [],
+            summary: game.description,
+            isLocal: false,
+            source: "ITAD"
+          }
+        })
+      )
+
+      // Cache the results
+      await cache.set(cacheKey, { games }, cacheTTL.search)
+
+      return NextResponse.json({ games, cached: false, source: "ITAD" })
+    }
+
+    // Fall back to sample data if ITAD returns no results
+    console.log(`[ITAD] No results, falling back to sample data`)
     const matchingGames = sampleGames.filter(game =>
       game.name.toLowerCase().includes(query)
     )
@@ -255,7 +361,8 @@ export async function GET(request: NextRequest) {
           genres: game.genres ? JSON.parse(game.genres) : [],
           platforms: game.platforms ? JSON.parse(game.platforms) : [],
           summary: game.description,
-          isLocal: false
+          isLocal: false,
+          source: "sample"
         }
       })
     )
@@ -263,7 +370,7 @@ export async function GET(request: NextRequest) {
     // Cache the results
     await cache.set(cacheKey, { games }, cacheTTL.search)
 
-    return NextResponse.json({ games, cached: false })
+    return NextResponse.json({ games, cached: false, source: "sample" })
   } catch (error) {
     console.error("Error searching games:", error)
     return NextResponse.json(
