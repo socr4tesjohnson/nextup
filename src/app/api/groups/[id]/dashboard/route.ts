@@ -3,6 +3,15 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth/options"
 import { prisma } from "@/lib/db/prisma"
 
+// Privacy preference interface
+interface PrivacyPreference {
+  userId: string
+  showActivityToGroup: number | boolean
+  showGameStatus: number | boolean
+  showRatings: number | boolean
+  showNotes: number | boolean
+}
+
 // GET /api/groups/[id]/dashboard - Get group dashboard data
 export async function GET(
   request: NextRequest,
@@ -47,10 +56,56 @@ export async function GET(
     })
     const memberIds = members.map(m => m.userId)
 
-    // Get "Now Playing" games - games with NOW_PLAYING status from group members
+    // Fetch privacy preferences for all members
+    let privacyPrefs: PrivacyPreference[] = []
+    try {
+      privacyPrefs = await prisma.$queryRawUnsafe<PrivacyPreference[]>(`
+        SELECT userId, showActivityToGroup, showGameStatus, showRatings, showNotes
+        FROM UserPrivacyPreference
+        WHERE userId IN (${memberIds.map(() => '?').join(',')})
+      `, ...memberIds)
+    } catch {
+      // Table might not exist yet, use defaults
+    }
+
+    // Create a map of userId -> privacy settings
+    const privacyMap = new Map<string, {
+      showActivityToGroup: boolean
+      showGameStatus: boolean
+      showRatings: boolean
+      showNotes: boolean
+    }>()
+
+    for (const pref of privacyPrefs) {
+      privacyMap.set(pref.userId, {
+        showActivityToGroup: Boolean(pref.showActivityToGroup),
+        showGameStatus: Boolean(pref.showGameStatus),
+        showRatings: Boolean(pref.showRatings),
+        showNotes: Boolean(pref.showNotes)
+      })
+    }
+
+    // Default privacy settings for users without preferences
+    const getPrivacy = (userId: string) => {
+      return privacyMap.get(userId) || {
+        showActivityToGroup: true,
+        showGameStatus: true,
+        showRatings: true,
+        showNotes: false
+      }
+    }
+
+    // Filter member IDs to only those who allow activity to be shown
+    const visibleMemberIds = memberIds.filter(id => {
+      // Always show current user's own activity
+      if (id === session.user.id) return true
+      return getPrivacy(id).showActivityToGroup
+    })
+
+    // Get "Now Playing" games - only from members who allow activity visibility
     const nowPlaying = await prisma.userGameEntry.findMany({
       where: {
-        userId: { in: memberIds },
+        userId: { in: visibleMemberIds },
         status: "NOW_PLAYING"
       },
       include: {
@@ -63,10 +118,10 @@ export async function GET(
       take: 10
     })
 
-    // Get "Most Wanted" games - games on wishlists, aggregated by count
+    // Get "Most Wanted" games - games on wishlists, aggregated by count (only from visible members)
     const wishlistEntries = await prisma.userGameEntry.findMany({
       where: {
-        userId: { in: memberIds },
+        userId: { in: visibleMemberIds },
         status: "WISHLIST"
       },
       include: {
@@ -98,10 +153,10 @@ export async function GET(
       .sort((a, b) => b.count - a.count)
       .slice(0, 5)
 
-    // Get "Recently Added" - most recent entries from any status
+    // Get "Recently Added" - most recent entries from visible members only
     const recentlyAdded = await prisma.userGameEntry.findMany({
       where: {
-        userId: { in: memberIds }
+        userId: { in: visibleMemberIds }
       },
       include: {
         game: true,
@@ -113,17 +168,28 @@ export async function GET(
       take: 10
     })
 
-    // Parse platforms JSON for each entry
-    const parseGamePlatforms = (entry: any) => ({
-      ...entry,
-      game: {
-        ...entry.game,
-        platforms: entry.game.platforms ? JSON.parse(entry.game.platforms) : []
+    // Parse platforms JSON and apply privacy filters for each entry
+    const applyPrivacyFilters = (entry: any) => {
+      const userPrivacy = getPrivacy(entry.userId)
+      const isOwnEntry = entry.userId === session.user.id
+
+      return {
+        ...entry,
+        // Only show rating if user allows it or it's their own entry
+        rating: (isOwnEntry || userPrivacy.showRatings) ? entry.rating : null,
+        // Only show notes if user allows it or it's their own entry
+        notes: (isOwnEntry || userPrivacy.showNotes) ? entry.notes : null,
+        // Only show status details if user allows it or it's their own entry
+        status: (isOwnEntry || userPrivacy.showGameStatus) ? entry.status : entry.status,
+        game: {
+          ...entry.game,
+          platforms: entry.game.platforms ? JSON.parse(entry.game.platforms) : []
+        }
       }
-    })
+    }
 
     return NextResponse.json({
-      nowPlaying: nowPlaying.map(parseGamePlatforms),
+      nowPlaying: nowPlaying.map(applyPrivacyFilters),
       mostWanted: mostWanted.map(item => ({
         ...item,
         game: {
@@ -131,7 +197,7 @@ export async function GET(
           platforms: item.game.platforms ? JSON.parse(item.game.platforms) : []
         }
       })),
-      recentlyAdded: recentlyAdded.map(parseGamePlatforms)
+      recentlyAdded: recentlyAdded.map(applyPrivacyFilters)
     })
   } catch (error) {
     console.error("Error fetching group dashboard:", error)
