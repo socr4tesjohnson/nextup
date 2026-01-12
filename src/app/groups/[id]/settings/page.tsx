@@ -56,6 +56,17 @@ interface GroupSettings {
   members: GroupMember[]
 }
 
+// Available regions for deal preferences
+const AVAILABLE_REGIONS = [
+  { code: "US", name: "United States" },
+  { code: "EU", name: "Europe" },
+  { code: "UK", name: "United Kingdom" },
+  { code: "CA", name: "Canada" },
+  { code: "AU", name: "Australia" },
+  { code: "BR", name: "Brazil" },
+  { code: "JP", name: "Japan" },
+]
+
 export default function GroupSettingsPage() {
   const { data: session, status } = useSession()
   const params = useParams()
@@ -68,6 +79,8 @@ export default function GroupSettingsPage() {
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
   const [name, setName] = useState("")
+  const [defaultPlatforms, setDefaultPlatforms] = useState<string[]>([])
+  const [defaultRegion, setDefaultRegion] = useState<string>("")
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deletePassword, setDeletePassword] = useState("")
   const [deleting, setDeleting] = useState(false)
@@ -84,6 +97,9 @@ export default function GroupSettingsPage() {
   const [memberToRemove, setMemberToRemove] = useState<GroupMember | null>(null)
   const [removing, setRemoving] = useState(false)
   const [removeError, setRemoveError] = useState("")
+
+  // Change role state
+  const [changingRole, setChangingRole] = useState<string | null>(null)
 
   useEffect(() => {
     if (status === "loading") return
@@ -105,6 +121,8 @@ export default function GroupSettingsPage() {
 
         setSettings(data.settings)
         setName(data.settings.name)
+        setDefaultPlatforms(data.settings.defaultPlatforms || [])
+        setDefaultRegion(data.settings.defaultRegion || "")
       } catch (err) {
         setError("Failed to load settings")
       } finally {
@@ -125,7 +143,7 @@ export default function GroupSettingsPage() {
       const response = await fetch(`/api/groups/${groupId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name })
+        body: JSON.stringify({ name, defaultPlatforms, defaultRegion: defaultRegion || null })
       })
 
       const data = await response.json()
@@ -293,6 +311,43 @@ export default function GroupSettingsPage() {
     setRemoveError("")
   }
 
+  const handleRoleChange = async (memberId: string, userId: string, newRole: string) => {
+    setChangingRole(memberId)
+    setError("")
+    setSuccess("")
+
+    try {
+      const response = await fetch(`/api/groups/${groupId}/members/${userId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role: newRole })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setError(data.error || "Failed to change role")
+        return
+      }
+
+      // Update local state
+      if (settings) {
+        setSettings({
+          ...settings,
+          members: settings.members.map(m =>
+            m.id === memberId ? { ...m, role: newRole } : m
+          )
+        })
+      }
+
+      setSuccess(`Role changed to ${newRole === 'ADMIN' ? 'Admin' : 'Member'} successfully`)
+    } catch (err) {
+      setError("Failed to change role")
+    } finally {
+      setChangingRole(null)
+    }
+  }
+
   const formatDate = (dateString) => {
     if (!dateString) return '—'
     try {
@@ -382,7 +437,7 @@ export default function GroupSettingsPage() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8 max-w-3xl">
+      <main id="main-content" className="container mx-auto px-4 py-8 max-w-3xl">
         <div className="mb-8">
           <Link href={`/groups/${groupId}`} className="text-sm text-muted-foreground hover:text-primary mb-2 block">
             ← Back to {settings.name}
@@ -427,6 +482,67 @@ export default function GroupSettingsPage() {
                   {saving ? "Saving..." : "Save Changes"}
                 </Button>
               </form>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Default Platforms</CardTitle>
+              <CardDescription>Set the default platform filter for the group dashboard</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Select platforms to filter by default when viewing the group dashboard.
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {["PC", "PlayStation 5", "PlayStation 4", "Xbox Series X|S", "Xbox One", "Nintendo Switch", "Steam Deck", "Mobile"].map((platform) => (
+                  <label key={platform} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={defaultPlatforms.includes(platform)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setDefaultPlatforms([...defaultPlatforms, platform])
+                        } else {
+                          setDefaultPlatforms(defaultPlatforms.filter(p => p !== platform))
+                        }
+                      }}
+                      className="w-4 h-4 rounded border-gray-300"
+                    />
+                    <span className="text-sm">{platform}</span>
+                  </label>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Leave all unchecked to show all platforms by default.
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Default Region</CardTitle>
+              <CardDescription>Set the default region for game deals in this group</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Select a region to show deals from by default for group members.
+              </p>
+              <select
+                value={defaultRegion}
+                onChange={(e) => setDefaultRegion(e.target.value)}
+                className="w-full p-2 border rounded-md bg-background"
+              >
+                <option value="">No default (use member preferences)</option>
+                {AVAILABLE_REGIONS.map((region) => (
+                  <option key={region.code} value={region.code}>
+                    {region.name} ({region.code})
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Leave unset to let each member use their own deal preferences.
+              </p>
             </CardContent>
           </Card>
 
@@ -481,6 +597,7 @@ export default function GroupSettingsPage() {
                     const isOwner = member.user.id === settings.owner.id
                     const isCurrentUser = member.user.id === session?.user?.id
                     const canRemove = settings.isOwner && !isOwner && !isCurrentUser
+                    const canChangeRole = settings.isOwner && !isOwner && !isCurrentUser
 
                     return (
                       <TableRow key={member.id}>
@@ -494,15 +611,29 @@ export default function GroupSettingsPage() {
                         </TableCell>
                         <TableCell className="whitespace-nowrap">{member.user.email}</TableCell>
                         <TableCell className="whitespace-nowrap">
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                            isOwner
-                              ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'
-                              : member.role === 'ADMIN'
-                              ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
-                              : 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
-                          }`}>
-                            {isOwner ? 'Owner' : member.role === 'ADMIN' ? 'Admin' : 'Member'}
-                          </span>
+                          {canChangeRole ? (
+                            <select
+                              value={member.role}
+                              onChange={(e) => handleRoleChange(member.id, member.user.id, e.target.value)}
+                              disabled={changingRole === member.id}
+                              className={`px-2 py-1 rounded-md text-xs font-medium border bg-background cursor-pointer ${
+                                changingRole === member.id ? 'opacity-50' : ''
+                              }`}
+                            >
+                              <option value="MEMBER">Member</option>
+                              <option value="ADMIN">Admin</option>
+                            </select>
+                          ) : (
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                              isOwner
+                                ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'
+                                : member.role === 'ADMIN'
+                                ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
+                                : 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
+                            }`}>
+                              {isOwner ? 'Owner' : member.role === 'ADMIN' ? 'Admin' : 'Member'}
+                            </span>
+                          )}
                         </TableCell>
                         <TableCell className="whitespace-nowrap">{formatDate(member.joinedAt)}</TableCell>
                         <TableCell className="text-right whitespace-nowrap">

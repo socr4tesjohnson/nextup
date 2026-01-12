@@ -59,6 +59,11 @@ const config: Config = {
           DEFAULT: '#f59e0b',
           foreground: '#ffffff',
         },
+        // Teal accent color from design spec
+        teal: {
+          DEFAULT: '#14b8a6',
+          foreground: '#ffffff',
+        },
         // Status colors for game entries
         'status-now-playing': '#6366f1',
         'status-finished': '#22c55e',

@@ -393,7 +393,7 @@ export default function GroupDetailPage() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
+      <main id="main-content" className="container mx-auto px-4 py-8">
         <Breadcrumb
           items={[
             { label: "Groups", href: "/groups" },

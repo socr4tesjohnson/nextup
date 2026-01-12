@@ -38,6 +38,7 @@ export async function GET(
       }
 
       // Create mock deals for demonstration
+      const now = new Date()
       const mockDeals = [
         {
           id: `mock-steam-${gameId}`,
@@ -47,7 +48,9 @@ export async function GET(
           discountPercent: 50,
           url: `https://store.steampowered.com/app/${game.slug || gameId}`,
           isHistoricalLow: false,
-          region: "US"
+          historicalLowPrice: 19.99,
+          region: "US",
+          fetchedAt: now.toISOString()
         },
         {
           id: `mock-gog-${gameId}`,
@@ -57,7 +60,9 @@ export async function GET(
           discountPercent: 58,
           url: `https://www.gog.com/game/${game.slug || gameId}`,
           isHistoricalLow: true,
-          region: "US"
+          historicalLowPrice: 24.99,
+          region: "US",
+          fetchedAt: now.toISOString()
         },
         {
           id: `mock-epic-${gameId}`,
@@ -67,7 +72,9 @@ export async function GET(
           discountPercent: 42,
           url: `https://store.epicgames.com/p/${game.slug || gameId}`,
           isHistoricalLow: false,
-          region: "US"
+          historicalLowPrice: 14.99,
+          region: "US",
+          fetchedAt: now.toISOString()
         },
         {
           id: `mock-humble-${gameId}`,
@@ -77,12 +84,26 @@ export async function GET(
           discountPercent: 47,
           url: `https://www.humblebundle.com/store/${game.slug || gameId}`,
           isHistoricalLow: false,
-          region: "US"
+          historicalLowPrice: 29.99,
+          region: "US",
+          fetchedAt: now.toISOString()
         }
+      ]
+
+      // Mock price history data
+      const mockPriceHistory = [
+        { date: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString(), price: 59.99, store: "Steam" },
+        { date: new Date(now.getTime() - 25 * 24 * 60 * 60 * 1000).toISOString(), price: 44.99, store: "Steam" },
+        { date: new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString(), price: 39.99, store: "GOG" },
+        { date: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString(), price: 29.99, store: "Steam" },
+        { date: now.toISOString(), price: 24.99, store: "GOG" },
       ]
 
       return NextResponse.json({
         deals: mockDeals,
+        priceHistory: mockPriceHistory,
+        lowestEverPrice: 14.99,
+        lowestEverStore: "Epic Games",
         isMockData: true
       })
     }

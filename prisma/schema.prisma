@@ -33,6 +33,7 @@ model User {
   dealPreferences         UserDealPreference?
   notifications           Notification[]
   notificationPreferences UserNotificationPreference?
+  privacyPreferences      UserPrivacyPreference?
 }
 
 model Account {
@@ -270,6 +271,26 @@ model UserNotificationPreference {
   emailNotifications Boolean  @default(false)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ============================================================================
+// User Privacy Preferences
+// ============================================================================
+
+model UserPrivacyPreference {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  showActivityToGroup   Boolean  @default(true)  // Show what games I'm playing to group members
+  showGameStatus        Boolean  @default(true)  // Show my game statuses (Now Playing, Finished, etc.)
+  showRatings           Boolean  @default(true)  // Show my game ratings to others
+  showNotes             Boolean  @default(false) // Show my personal notes to others
+  showOnlineStatus      Boolean  @default(true)  // Show when I was last active
+  allowGroupInvites     Boolean  @default(true)  // Allow anyone to invite me to groups
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)

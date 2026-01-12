@@ -56,6 +56,14 @@ export default function SettingsPage() {
   const [successMessage, setSuccessMessage] = useState("")
   const [errorMessage, setErrorMessage] = useState("")
 
+  // Avatar state
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [avatarSuccessMessage, setAvatarSuccessMessage] = useState("")
+  const [avatarErrorMessage, setAvatarErrorMessage] = useState("")
+
   // Change password state
   const [currentPassword, setCurrentPassword] = useState("")
   const [newPassword, setNewPassword] = useState("")
@@ -124,12 +132,15 @@ export default function SettingsPage() {
     return () => document.removeEventListener("keydown", handleEscape)
   }, [showDeleteDialog])
 
-  // Initialize name from session
+  // Initialize name and avatar from session
   useEffect(() => {
     if (session?.user?.name) {
       setName(session.user.name)
     }
-  }, [session?.user?.name])
+    if (session?.user?.image) {
+      setAvatarPreview(session.user.image)
+    }
+  }, [session?.user?.name, session?.user?.image])
 
   // Fetch deal preferences
   useEffect(() => {
@@ -181,6 +192,128 @@ export default function SettingsPage() {
 
   const handleSignOut = () => {
     signOut({ callbackUrl: "/" })
+  }
+
+  const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Validate file type
+    const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"]
+    if (!allowedTypes.includes(file.type)) {
+      setAvatarErrorMessage("Please select a JPEG, PNG, GIF, or WebP image.")
+      return
+    }
+
+    // Validate file size (2MB max)
+    if (file.size > 2 * 1024 * 1024) {
+      setAvatarErrorMessage("File too large. Maximum size is 2MB.")
+      return
+    }
+
+    setAvatarFile(file)
+    setAvatarErrorMessage("")
+
+    // Create preview
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setAvatarPreview(reader.result as string)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleAvatarUpload = async () => {
+    if (!avatarFile) {
+      setAvatarErrorMessage("Please select an image first")
+      return
+    }
+
+    setUploadingAvatar(true)
+    setUploadProgress(0)
+    setAvatarSuccessMessage("")
+    setAvatarErrorMessage("")
+
+    try {
+      const formData = new FormData()
+      formData.append("avatar", avatarFile)
+
+      // Use XMLHttpRequest for upload progress tracking
+      const xhr = new XMLHttpRequest()
+
+      const uploadPromise = new Promise<{ success: boolean; image?: string; error?: string }>((resolve, reject) => {
+        xhr.upload.addEventListener("progress", (event) => {
+          if (event.lengthComputable) {
+            const progress = Math.round((event.loaded / event.total) * 100)
+            setUploadProgress(progress)
+          }
+        })
+
+        xhr.addEventListener("load", () => {
+          try {
+            const data = JSON.parse(xhr.responseText)
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve(data)
+            } else {
+              reject(new Error(data.error || "Failed to upload avatar"))
+            }
+          } catch {
+            reject(new Error("Failed to parse response"))
+          }
+        })
+
+        xhr.addEventListener("error", () => {
+          reject(new Error("Network error during upload"))
+        })
+
+        xhr.open("POST", "/api/users/me/avatar")
+        xhr.send(formData)
+      })
+
+      const data = await uploadPromise
+
+      // Update session with new avatar
+      await updateSession({ image: data.image })
+      setAvatarFile(null)
+      setUploadProgress(100)
+      setAvatarSuccessMessage("Avatar uploaded successfully!")
+      setTimeout(() => {
+        setAvatarSuccessMessage("")
+        setUploadProgress(0)
+      }, 3000)
+    } catch (error) {
+      setAvatarErrorMessage(error instanceof Error ? error.message : "Failed to upload avatar")
+      setUploadProgress(0)
+    } finally {
+      setUploadingAvatar(false)
+    }
+  }
+
+  const handleRemoveAvatar = async () => {
+    setUploadingAvatar(true)
+    setAvatarSuccessMessage("")
+    setAvatarErrorMessage("")
+
+    try {
+      const response = await fetch("/api/users/me/avatar", {
+        method: "DELETE",
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || "Failed to remove avatar")
+      }
+
+      // Clear avatar in UI
+      setAvatarPreview(null)
+      setAvatarFile(null)
+      await updateSession({ image: null })
+      setAvatarSuccessMessage("Avatar removed successfully!")
+      setTimeout(() => setAvatarSuccessMessage(""), 3000)
+    } catch (error) {
+      setAvatarErrorMessage(error instanceof Error ? error.message : "Failed to remove avatar")
+    } finally {
+      setUploadingAvatar(false)
+    }
   }
 
   const handleSaveProfile = async () => {
@@ -427,7 +560,7 @@ export default function SettingsPage() {
     <div className="min-h-screen bg-background">
       <Header />
 
-      <main className="container mx-auto px-4 py-8 max-w-3xl">
+      <main id="main-content" className="container mx-auto px-4 py-8 max-w-3xl">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Settings</h1>
           <p className="text-muted-foreground">
@@ -462,7 +595,89 @@ export default function SettingsPage() {
         <div className="space-y-6">
           {/* Profile Tab */}
           {activeTab === "profile" && (
-            <div id="profile-panel" role="tabpanel" aria-labelledby="profile-tab">
+            <div id="profile-panel" role="tabpanel" aria-labelledby="profile-tab" className="space-y-6">
+              {/* Avatar Card */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Profile Picture</CardTitle>
+                  <CardDescription>Upload a profile picture to personalize your account.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {avatarSuccessMessage && (
+                    <div className="p-3 text-sm text-green-800 bg-green-100 rounded-md">
+                      {avatarSuccessMessage}
+                    </div>
+                  )}
+                  {avatarErrorMessage && (
+                    <div className="p-3 text-sm text-red-800 bg-red-100 rounded-md">
+                      {avatarErrorMessage}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-6">
+                    {/* Avatar Preview */}
+                    <div className="w-24 h-24 rounded-full overflow-hidden bg-muted flex items-center justify-center">
+                      {avatarPreview ? (
+                        <img
+                          src={avatarPreview}
+                          alt="Avatar preview"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-3xl text-muted-foreground">
+                          {session?.user?.name?.charAt(0)?.toUpperCase() || "?"}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex-1 space-y-3">
+                      <div>
+                        <Label htmlFor="avatar-upload" className="cursor-pointer">
+                          <div className="inline-flex items-center justify-center rounded-md text-sm font-medium h-10 px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer">
+                            Choose Image
+                          </div>
+                        </Label>
+                        <input
+                          id="avatar-upload"
+                          type="file"
+                          accept="image/jpeg,image/png,image/gif,image/webp"
+                          onChange={handleAvatarSelect}
+                          className="hidden"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          JPEG, PNG, GIF or WebP. Max 2MB.
+                        </p>
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        {avatarFile && (
+                          <Button onClick={handleAvatarUpload} disabled={uploadingAvatar}>
+                            {uploadingAvatar ? `Uploading... ${uploadProgress}%` : "Save Avatar"}
+                          </Button>
+                        )}
+                        {avatarPreview && !avatarFile && (
+                          <Button variant="outline" onClick={handleRemoveAvatar} disabled={uploadingAvatar}>
+                            {uploadingAvatar ? "Removing..." : "Remove Avatar"}
+                          </Button>
+                        )}
+                        {/* Upload Progress Bar */}
+                        {uploadingAvatar && uploadProgress > 0 && (
+                          <div className="w-full">
+                            <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
+                              <div
+                                className="bg-primary h-2.5 rounded-full transition-all duration-300"
+                                style={{ width: `${uploadProgress}%` }}
+                              ></div>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1 text-center">
+                              {uploadProgress < 100 ? `Uploading: ${uploadProgress}%` : "Upload complete!"}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Profile Info Card */}
               <Card>
                 <CardHeader>
                   <CardTitle>Profile</CardTitle>

@@ -24,8 +24,28 @@ export async function GET(
 
     if (cachedResult) {
       console.log(`[Cache HIT] Game detail: "${gameId}"`)
+      // Still need to check user's entry (not cached)
+      const userEntry = await prisma.userGameEntry.findUnique({
+        where: {
+          userId_gameId: {
+            userId: session.user.id,
+            gameId
+          }
+        }
+      })
       return NextResponse.json({
         game: cachedResult.game,
+        userEntry: userEntry ? {
+          id: userEntry.id,
+          status: userEntry.status,
+          platform: userEntry.platform,
+          rating: userEntry.rating,
+          notes: userEntry.notes,
+          startedAt: userEntry.startedAt,
+          finishedAt: userEntry.finishedAt,
+          createdAt: userEntry.createdAt,
+          updatedAt: userEntry.updatedAt
+        } : null,
         cached: true
       })
     }
@@ -57,8 +77,29 @@ export async function GET(
     // Cache the result (24 hours for game details)
     await cache.set(cacheKey, { game: gameData }, cacheTTL.gameDetail)
 
+    // Fetch user's entry for this game (not cached - user-specific)
+    const userEntry = await prisma.userGameEntry.findUnique({
+      where: {
+        userId_gameId: {
+          userId: session.user.id,
+          gameId
+        }
+      }
+    })
+
     return NextResponse.json({
       game: gameData,
+      userEntry: userEntry ? {
+        id: userEntry.id,
+        status: userEntry.status,
+        platform: userEntry.platform,
+        rating: userEntry.rating,
+        notes: userEntry.notes,
+        startedAt: userEntry.startedAt,
+        finishedAt: userEntry.finishedAt,
+        createdAt: userEntry.createdAt,
+        updatedAt: userEntry.updatedAt
+      } : null,
       cached: false
     })
   } catch (error) {

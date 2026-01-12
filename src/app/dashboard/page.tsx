@@ -6,6 +6,7 @@ import Link from "next/link"
 import { Header } from "@/components/layout/header"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
 
 interface GameEntry {
   id: string
@@ -68,7 +69,7 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-background">
       <Header />
 
-      <main className="container mx-auto px-4 py-8">
+      <main id="main-content" className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">
             Welcome back{session?.user?.name ? `, ${session.user.name}` : ""}!
@@ -86,7 +87,11 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               {loading ? (
-                <div className="animate-pulse h-20 bg-muted rounded"></div>
+                <div className="space-y-3">
+                  <Skeleton className="h-8 w-full" />
+                  <Skeleton className="h-8 w-4/5" />
+                  <Skeleton className="h-8 w-3/5" />
+                </div>
               ) : stats.groups.length > 0 ? (
                 <div className="space-y-2">
                   {stats.groups.slice(0, 3).map(group => (
@@ -125,7 +130,16 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               {loading ? (
-                <div className="animate-pulse h-20 bg-muted rounded"></div>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="w-8 h-10 rounded" />
+                    <Skeleton className="h-4 flex-1" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="w-8 h-10 rounded" />
+                    <Skeleton className="h-4 flex-1" />
+                  </div>
+                </div>
               ) : stats.nowPlaying.length > 0 ? (
                 <div className="space-y-2">
                   {stats.nowPlaying.slice(0, 3).map(entry => (
@@ -170,7 +184,16 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               {loading ? (
-                <div className="animate-pulse h-20 bg-muted rounded"></div>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="w-8 h-10 rounded" />
+                    <Skeleton className="h-4 flex-1" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="w-8 h-10 rounded" />
+                    <Skeleton className="h-4 flex-1" />
+                  </div>
+                </div>
               ) : stats.wishlist.length > 0 ? (
                 <div className="space-y-2">
                   {stats.wishlist.slice(0, 3).map(entry => (

@@ -35,6 +35,26 @@ export default function GroupsPage() {
   const [joining, setJoining] = useState(false)
   const [error, setError] = useState("")
 
+  // Handle Escape key to close modals
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (showCreateModal) {
+          setShowCreateModal(false)
+          setNewGroupName("")
+          setError("")
+        }
+        if (showJoinModal) {
+          setShowJoinModal(false)
+          setInviteCode("")
+          setError("")
+        }
+      }
+    }
+    document.addEventListener("keydown", handleEscape)
+    return () => document.removeEventListener("keydown", handleEscape)
+  }, [showCreateModal, showJoinModal])
+
   useEffect(() => {
     if (status === "loading") return
 
@@ -112,7 +132,7 @@ export default function GroupsPage() {
     <div className="min-h-screen bg-background">
       <Header />
 
-      <main className="container mx-auto px-4 py-8">
+      <main id="main-content" className="container mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold mb-2">My Groups</h1>
@@ -145,7 +165,7 @@ export default function GroupsPage() {
               </p>
               <div className="flex gap-4">
                 <Button onClick={() => setShowCreateModal(true)}>Create Your First Group</Button>
-                <Button variant="outline" onClick={() => setShowJoinModal(true)}>
+                <Button variant="secondary" onClick={() => setShowJoinModal(true)}>
                   Join with Invite Code
                 </Button>
               </div>
@@ -174,7 +194,7 @@ export default function GroupsPage() {
               ))}
             </div>
             <div className="mt-6">
-              <Button variant="outline" onClick={() => setShowJoinModal(true)}>
+              <Button variant="secondary" onClick={() => setShowJoinModal(true)}>
                 Join with Invite Code
               </Button>
             </div>
@@ -183,8 +203,15 @@ export default function GroupsPage() {
 
         {/* Create Group Modal */}
         {showCreateModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <Card className="w-full max-w-md mx-4">
+          <div
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+            onClick={() => {
+              setShowCreateModal(false)
+              setNewGroupName("")
+              setError("")
+            }}
+          >
+            <Card className="w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
               <CardHeader>
                 <CardTitle>Create a New Group</CardTitle>
                 <CardDescription>
@@ -234,8 +261,15 @@ export default function GroupsPage() {
 
         {/* Join Group Modal */}
         {showJoinModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <Card className="w-full max-w-md mx-4">
+          <div
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+            onClick={() => {
+              setShowJoinModal(false)
+              setInviteCode("")
+              setError("")
+            }}
+          >
+            <Card className="w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
               <CardHeader>
                 <CardTitle>Join a Group</CardTitle>
                 <CardDescription>

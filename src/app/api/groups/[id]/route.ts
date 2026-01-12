@@ -68,6 +68,7 @@ export async function GET(
     return NextResponse.json({
       group: {
         ...group,
+        defaultPlatforms: group.defaultPlatforms ? JSON.parse(group.defaultPlatforms) : [],
         userRole: membership.role,
         isOwner: group.ownerId === session.user.id
       }

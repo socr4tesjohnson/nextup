@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useSession } from "next-auth/react"
 import Link from "next/link"
 import { Header } from "@/components/layout/header"
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
 
 interface Game {
   id: string
@@ -43,6 +44,19 @@ export default function SearchPage() {
   const [platform, setPlatform] = useState("")
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
+
+  // Handle Escape key to close modal
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && showAddModal) {
+        setShowAddModal(false)
+        setSelectedGame(null)
+        setError("")
+      }
+    }
+    document.addEventListener("keydown", handleEscape)
+    return () => document.removeEventListener("keydown", handleEscape)
+  }, [showAddModal])
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -119,7 +133,7 @@ export default function SearchPage() {
     <div className="min-h-screen bg-background">
       <Header />
 
-      <main className="container mx-auto px-4 py-8">
+      <main id="main-content" className="container mx-auto px-4 py-8">
         <div className="max-w-2xl mx-auto mb-8">
           <h1 className="text-3xl font-bold mb-2">Search Games</h1>
           <p className="text-muted-foreground mb-6">
@@ -153,17 +167,32 @@ export default function SearchPage() {
           </div>
         )}
 
-        {results.length > 0 ? (
+        {searching ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[...Array(6)].map((_, i) => (
+              <Card key={i} className="overflow-hidden">
+                <Skeleton className="aspect-[3/4] rounded-none" />
+                <CardHeader className="pb-2">
+                  <Skeleton className="h-6 w-3/4" />
+                  <Skeleton className="h-4 w-1/4 mt-2" />
+                </CardHeader>
+                <CardContent>
+                  <Skeleton className="h-10 w-full" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : results.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {results.map((game) => (
-              <Card key={game.id} className="overflow-hidden">
+              <Card key={game.id} className="overflow-hidden group hover:shadow-lg hover:scale-[1.02] transition-all duration-200">
                 <Link href={`/games/${game.id}`} className="block">
-                  <div className="aspect-[3/4] relative bg-muted">
+                  <div className="aspect-[3/4] relative bg-muted overflow-hidden">
                     {game.coverUrl ? (
                       <img
                         src={game.coverUrl}
                         alt={game.name}
-                        className="object-cover w-full h-full"
+                        className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-200"
                       />
                     ) : (
                       <div className="flex items-center justify-center w-full h-full text-muted-foreground">
@@ -172,11 +201,28 @@ export default function SearchPage() {
                     )}
                   </div>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-lg line-clamp-1 hover:text-primary">{game.name}</CardTitle>
+                    <CardTitle className="text-lg line-clamp-1 group-hover:text-primary transition-colors">{game.name}</CardTitle>
                     {game.firstReleaseDate && (
                       <CardDescription>
                         {new Date(game.firstReleaseDate).getFullYear()}
                       </CardDescription>
+                    )}
+                    {game.platforms && game.platforms.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {game.platforms.slice(0, 3).map((platform) => (
+                          <span
+                            key={platform}
+                            className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                          >
+                            {platform}
+                          </span>
+                        ))}
+                        {game.platforms.length > 3 && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">
+                            +{game.platforms.length - 3}
+                          </span>
+                        )}
+                      </div>
                     )}
                   </CardHeader>
                 </Link>
@@ -210,8 +256,15 @@ export default function SearchPage() {
 
         {/* Add to List Modal */}
         {showAddModal && selectedGame && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <Card className="w-full max-w-md mx-4">
+          <div
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+            onClick={() => {
+              setShowAddModal(false)
+              setSelectedGame(null)
+              setError("")
+            }}
+          >
+            <Card className="w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
               <CardHeader>
                 <CardTitle>Add to List</CardTitle>
                 <CardDescription>

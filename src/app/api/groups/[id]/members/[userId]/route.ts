@@ -16,6 +16,119 @@ async function checkAdmin(groupId: string, userId: string) {
   return member?.role === "ADMIN"
 }
 
+// PATCH /api/groups/[id]/members/[userId] - Update member role (owner only)
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { id: string; userId: string } }
+) {
+  try {
+    const session = await getServerSession(authOptions)
+
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const { id: groupId, userId: targetUserId } = params
+    const body = await request.json()
+    const { role } = body
+
+    // Validate role
+    if (!role || !["ADMIN", "MEMBER"].includes(role)) {
+      return NextResponse.json(
+        { error: "Invalid role. Must be ADMIN or MEMBER" },
+        { status: 400 }
+      )
+    }
+
+    // Check if the group exists
+    const group = await prisma.group.findUnique({
+      where: { id: groupId }
+    })
+
+    if (!group) {
+      return NextResponse.json({ error: "Group not found" }, { status: 404 })
+    }
+
+    // Only the owner can change roles
+    if (group.ownerId !== session.user.id) {
+      return NextResponse.json(
+        { error: "Only the group owner can change member roles" },
+        { status: 403 }
+      )
+    }
+
+    // Cannot change the owner's role
+    if (targetUserId === group.ownerId) {
+      return NextResponse.json(
+        { error: "Cannot change the owner's role" },
+        { status: 400 }
+      )
+    }
+
+    // Cannot change your own role (owner can't demote themselves)
+    if (targetUserId === session.user.id) {
+      return NextResponse.json(
+        { error: "Cannot change your own role" },
+        { status: 400 }
+      )
+    }
+
+    // Check if target user is actually a member
+    const targetMember = await prisma.groupMember.findUnique({
+      where: {
+        groupId_userId: {
+          groupId,
+          userId: targetUserId
+        }
+      }
+    })
+
+    if (!targetMember) {
+      return NextResponse.json(
+        { error: "User is not a member of this group" },
+        { status: 404 }
+      )
+    }
+
+    // Update the member's role
+    const updatedMember = await prisma.groupMember.update({
+      where: {
+        groupId_userId: {
+          groupId,
+          userId: targetUserId
+        }
+      },
+      data: { role },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            image: true
+          }
+        }
+      }
+    })
+
+    return NextResponse.json({
+      success: true,
+      member: {
+        id: updatedMember.id,
+        role: updatedMember.role,
+        joinedAt: updatedMember.joinedAt,
+        user: updatedMember.user
+      }
+    })
+  } catch (error) {
+    console.error("Error updating member role:", error)
+    return NextResponse.json(
+      { error: "Failed to update member role" },
+      { status: 500 }
+    )
+  }
+}
+
 // DELETE /api/groups/[id]/members/[userId] - Remove member from group (admin only)
 export async function DELETE(
   request: NextRequest,

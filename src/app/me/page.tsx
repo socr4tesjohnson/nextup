@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useSession } from "next-auth/react"
+import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Header } from "@/components/layout/header"
 import { Button } from "@/components/ui/button"
@@ -87,6 +88,7 @@ const SORT_OPTIONS = [
 
 export default function MyListsPage() {
   const { data: session, status: sessionStatus } = useSession()
+  const searchParams = useSearchParams()
   const [entries, setEntries] = useState<GameEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState("")
@@ -111,6 +113,25 @@ export default function MyListsPage() {
   const [saving, setSaving] = useState(false)
   const [editError, setEditError] = useState("")
   const [successMessage, setSuccessMessage] = useState("")
+
+  // Initialize filter from URL params
+  useEffect(() => {
+    const statusParam = searchParams.get("status")
+    if (statusParam && FILTER_OPTIONS.some(opt => opt.value === statusParam)) {
+      setFilter(statusParam)
+    }
+  }, [searchParams])
+
+  // Handle Escape key to close modal
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && showEditModal) {
+        handleCloseModal()
+      }
+    }
+    document.addEventListener("keydown", handleEscape)
+    return () => document.removeEventListener("keydown", handleEscape)
+  }, [showEditModal])
 
   const PLATFORM_OPTIONS = [
     { value: "", label: "Select platform (optional)" },
@@ -345,7 +366,7 @@ export default function MyListsPage() {
     <div className="min-h-screen bg-background">
       <Header />
 
-      <main className="container mx-auto px-4 py-8">
+      <main id="main-content" className="container mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold mb-2">My Game Lists</h1>
@@ -541,8 +562,11 @@ export default function MyListsPage() {
 
         {/* Edit Modal */}
         {showEditModal && editingEntry && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <Card className="w-full max-w-md mx-4">
+          <div
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+            onClick={handleCloseModal}
+          >
+            <Card className="w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
               <CardHeader>
                 <CardTitle>Edit Entry</CardTitle>
                 <CardDescription>

@@ -70,8 +70,9 @@ export async function GET(
         owner: group.owner,
         isOwner: group.ownerId === session.user.id,
         members: group.members.map(m => ({
-          id: m.userId,
+          id: m.id,
           role: m.role,
+          joinedAt: m.joinedAt,
           user: m.user
         }))
       }

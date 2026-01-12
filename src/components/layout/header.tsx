@@ -109,9 +109,17 @@ export function Header() {
   }
 
   return (
-    <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-        <Link href="/dashboard" className="text-xl font-bold">
+    <>
+      {/* Skip to main content link for accessibility */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-4 focus:left-4 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+      >
+        Skip to main content
+      </a>
+      <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+          <Link href="/dashboard" className="text-xl font-bold">
           <span className="bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">
             NextUp
           </span>
@@ -388,6 +396,7 @@ export function Header() {
           </nav>
         </div>
       )}
-    </header>
+      </header>
+    </>
   )
 }

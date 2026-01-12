@@ -4,6 +4,30 @@ import { authOptions } from "@/lib/auth/options"
 import { prisma } from "@/lib/db/prisma"
 import { cache, cacheKeys, cacheTTL } from "@/lib/cache"
 
+// Simple in-memory rate limiter (per user)
+const rateLimitStore = new Map<string, { count: number; resetTime: number }>()
+const RATE_LIMIT_WINDOW = 60 * 1000 // 1 minute
+const RATE_LIMIT_MAX = 30 // max 30 requests per minute
+
+function checkRateLimit(userId: string): { limited: boolean; retryAfter?: number } {
+  const now = Date.now()
+  const userLimit = rateLimitStore.get(userId)
+
+  if (!userLimit || now > userLimit.resetTime) {
+    // Reset or create new entry
+    rateLimitStore.set(userId, { count: 1, resetTime: now + RATE_LIMIT_WINDOW })
+    return { limited: false }
+  }
+
+  if (userLimit.count >= RATE_LIMIT_MAX) {
+    const retryAfter = Math.ceil((userLimit.resetTime - now) / 1000)
+    return { limited: true, retryAfter }
+  }
+
+  userLimit.count++
+  return { limited: false }
+}
+
 // Sample game data for testing - later will integrate with IGDB API
 const sampleGames = [
   {
@@ -114,6 +138,23 @@ export async function GET(request: NextRequest) {
 
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    // Check rate limit
+    const rateLimit = checkRateLimit(session.user.id)
+    if (rateLimit.limited) {
+      return NextResponse.json(
+        {
+          error: `Too many requests. Please wait ${rateLimit.retryAfter} seconds before searching again.`,
+          retryAfter: rateLimit.retryAfter
+        },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': String(rateLimit.retryAfter)
+          }
+        }
+      )
     }
 
     const { searchParams } = new URL(request.url)
