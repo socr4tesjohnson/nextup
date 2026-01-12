@@ -119,3 +119,82 @@ Remaining 5 Features (all need external dependencies):
 
 ## Project Complete!
 All 160 features implemented and verified.
+
+# Session 14 Update - Additional Features Complete!
+
+## Status: 162/162 features passing (100%)
+
+## Features Completed This Session:
+
+### Feature 164 - Search by Click
+- Made genre, platform, theme, and game mode badges clickable on game detail pages
+- Clicking a badge navigates to search page with that filter applied
+- Search page shows active filters with remove buttons
+- AND search logic: multiple filters narrow results (games must match ALL filters)
+- Search result cards also have clickable badges to add more filters
+- "Clear all" button to reset filters
+
+### Feature 165 - Tier List Categories
+- Added categories, platforms, and gameModes fields to TierList model
+- Category inputs in tier list creation modal
+- Category badges displayed on tier list cards
+- Category editing in tier list settings modal
+- Clickable category badges that link to search with appropriate filter
+- Filter section for public tier lists by category/platform/gameMode
+
+## Technical Changes:
+- Updated prisma/schema.prisma with TierList category fields
+- Modified src/app/games/[id]/page.tsx for clickable badges
+- Enhanced src/app/search/page.tsx with AND filter logic
+- Updated src/app/tier-lists/page.tsx with category creation and filtering
+- Updated src/app/tier-lists/[id]/page.tsx with category display and editing
+- Modified API routes for tier list categories support
+
+# Session 15 Update - Regression Testing and Maintenance
+
+## Status: 162/162 features passing (100%)
+
+## Session Summary:
+This session focused on regression testing and verifying the application is still functional.
+
+### Regression Tests Performed:
+
+1. **User Authentication** - ✅ VERIFIED
+   - Login with testuser123@example.com / Password123 works
+   - Session persists across page navigation
+   - Dashboard shows user name correctly
+
+2. **Game Search** - ✅ VERIFIED
+   - Search for "Witcher" returns real game data from ITAD API
+   - Game cover images display correctly
+   - Multiple games displayed in grid format
+
+3. **Feature #124 - Similar Games Section** - ✅ VERIFIED
+   - Similar Games section displays on game detail page
+   - Shows related games with cover images and similarity reasons
+   - Navigation to similar games works correctly
+
+4. **Feature #126 - Your Status Shows on Game Page** - ✅ VERIFIED
+   - Added "The Witcher: Enhanced Edition Director's Cut" to list with "Now Playing" status
+   - Game detail page shows "Your Status: Now Playing" section
+   - "Edit in My Lists" button links to /me
+
+5. **Where to Buy / Deals Section** - ✅ VERIFIED
+   - Real deal data from IsThereAnyDeal API displayed
+   - Shows GOG, Humble Store, Steam prices
+   - Links go to ITAD affiliate links
+
+### Environment Updates:
+- Updated NEXTAUTH_URL in .env to match running server port (3010)
+
+## Server Configuration
+- Development server: http://localhost:3010
+- Database: SQLite (prisma/dev.db)
+
+## Test Users
+- testuser123@example.com / Password123
+
+## Notes
+- Button clicks sometimes require JavaScript evaluation to trigger React event handlers
+- Form submissions work when using dispatchEvent with submit event
+- All core functionality working correctly
