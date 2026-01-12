@@ -39,6 +39,8 @@ const sampleGames = [
     firstReleaseDate: new Date("2015-05-19"),
     genres: JSON.stringify(["Action", "RPG", "Adventure"]),
     platforms: JSON.stringify(["PC", "PlayStation 4", "Xbox One", "Nintendo Switch"]),
+    gameModes: JSON.stringify(["Single player"]),
+    playerCount: "1",
     description: "The Witcher 3: Wild Hunt is a story-driven open world RPG set in a visually stunning fantasy universe full of meaningful choices and impactful consequences."
   },
   {
@@ -50,6 +52,8 @@ const sampleGames = [
     firstReleaseDate: new Date("2017-03-03"),
     genres: JSON.stringify(["Action", "Adventure"]),
     platforms: JSON.stringify(["Nintendo Switch", "Wii U"]),
+    gameModes: JSON.stringify(["Single player"]),
+    playerCount: "1",
     description: "Step into a world of discovery, exploration, and adventure in The Legend of Zelda: Breath of the Wild."
   },
   {
@@ -61,6 +65,8 @@ const sampleGames = [
     firstReleaseDate: new Date("2022-02-25"),
     genres: JSON.stringify(["Action", "RPG"]),
     platforms: JSON.stringify(["PC", "PlayStation 5", "Xbox Series X"]),
+    gameModes: JSON.stringify(["Single player", "Multiplayer", "Co-op"]),
+    playerCount: "1-4 online",
     description: "Elden Ring is an action RPG developed by FromSoftware and published by Bandai Namco Entertainment."
   },
   {
@@ -72,6 +78,8 @@ const sampleGames = [
     firstReleaseDate: new Date("2023-08-03"),
     genres: JSON.stringify(["RPG", "Strategy"]),
     platforms: JSON.stringify(["PC", "PlayStation 5", "Xbox Series X"]),
+    gameModes: JSON.stringify(["Single player", "Multiplayer", "Co-op"]),
+    playerCount: "1-4",
     description: "An epic RPG from Larian Studios, set in the Dungeons & Dragons universe."
   },
   {
@@ -83,6 +91,8 @@ const sampleGames = [
     firstReleaseDate: new Date("2020-09-17"),
     genres: JSON.stringify(["Action", "Roguelike"]),
     platforms: JSON.stringify(["PC", "Nintendo Switch", "PlayStation", "Xbox"]),
+    gameModes: JSON.stringify(["Single player"]),
+    playerCount: "1",
     description: "Defy the god of the dead as you hack and slash out of the Underworld in this rogue-like dungeon crawler."
   },
   {
@@ -94,6 +104,8 @@ const sampleGames = [
     firstReleaseDate: new Date("2017-02-24"),
     genres: JSON.stringify(["Action", "Platformer", "Metroidvania"]),
     platforms: JSON.stringify(["PC", "Nintendo Switch", "PlayStation", "Xbox"]),
+    gameModes: JSON.stringify(["Single player"]),
+    playerCount: "1",
     description: "Forge your own path in Hollow Knight! An epic action adventure through a vast ruined kingdom of insects and heroes."
   },
   {
@@ -105,6 +117,8 @@ const sampleGames = [
     firstReleaseDate: new Date("2018-01-25"),
     genres: JSON.stringify(["Platformer", "Indie"]),
     platforms: JSON.stringify(["PC", "Nintendo Switch", "PlayStation", "Xbox"]),
+    gameModes: JSON.stringify(["Single player"]),
+    playerCount: "1",
     description: "Help Madeline survive her inner demons on her journey to the top of Celeste Mountain."
   },
   {
@@ -116,6 +130,8 @@ const sampleGames = [
     firstReleaseDate: new Date("2022-11-09"),
     genres: JSON.stringify(["Action", "Adventure"]),
     platforms: JSON.stringify(["PlayStation 4", "PlayStation 5"]),
+    gameModes: JSON.stringify(["Single player"]),
+    playerCount: "1",
     description: "Embark on a mythic journey for answers and allies before Ragnarök arrives."
   },
   {
@@ -127,6 +143,8 @@ const sampleGames = [
     firstReleaseDate: new Date("2016-02-26"),
     genres: JSON.stringify(["Simulation", "RPG"]),
     platforms: JSON.stringify(["PC", "Nintendo Switch", "PlayStation", "Xbox", "Mobile"]),
+    gameModes: JSON.stringify(["Single player", "Multiplayer", "Co-op"]),
+    playerCount: "1-4",
     description: "You've inherited your grandfather's old farm plot in Stardew Valley."
   }
 ]

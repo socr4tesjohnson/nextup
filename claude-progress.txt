@@ -1,8 +1,8 @@
 # NextUp Development Progress
 
-## Last Updated: Session 9
+## Last Updated: Session 10
 
-## Current Status: 136/156 features passing (87.2%)
+## Current Status: 152/158 features passing (96.2%)
 
 ## Completed Features
 
@@ -48,68 +48,78 @@
 - Click game shows member statuses
 
 ### Session 9: Feature #123
-
-#### Feature #123: Privacy settings control visibility - PASSING
-- Privacy tab exists in Settings page with toggles for:
-  - Show Activity to Group
-  - Show Game Status
-  - Show Ratings
-  - Show Notes
-  - Show Online Status
-  - Allow Group Invites
+- Privacy settings control visibility
+- Privacy tab in Settings with toggles
 - Settings persist to database (UserPrivacyPreference table)
-- Updated group dashboard API to filter data based on privacy settings
-- When "Show Activity to Group" is disabled:
-  - User's games don't appear in Now Playing section
-  - User's wishlist entries don't count in Most Wanted
-  - User's entries don't appear in Recently Added
-- Ratings and notes are filtered based on individual user preferences
-- User's own data always visible regardless of settings
-- Verified with browser automation:
-  - Changed Test User's "Show Activity to Group" to OFF
-  - Logged in as Second User
-  - Confirmed Test User's games were hidden from group dashboard
+- Group dashboard API filters data based on privacy settings
+
+### Session 10: Features #156, #157, #158
+
+#### Feature #156: API Keys Documentation - PASSING
+- Added comprehensive "API Keys Setup Guide" section to README.md
+- Instructions for IGDB (Twitch), IsThereAnyDeal, Google OAuth, SMTP
+
+#### Feature #157: Amount of Players - PASSING
+- Added gameModes and playerCount fields to Game model in Prisma schema
+- Updated sample games data with game modes (Single player, Multiplayer, Co-op)
+- Updated game detail API to return gameModes and playerCount
+- Added "Players" section to game detail page UI with color-coded badges:
+  - Single player: Blue badge
+  - Multiplayer: Purple badge
+  - Co-op: Green badge
+- Player count displayed as text (e.g., "1-4 online players")
+- Used raw SQL query to bypass Prisma client caching issue
+- Created cache clear API endpoint for development
+
+#### Feature #158: Game Detail Navigation - PASSING
+- Made game cards clickable in My Lists page (/me)
+- Made game entries clickable in Dashboard (Now Playing, Wishlist sections)
+- Made games clickable in Group page (Now Playing, Most Wanted, Recently Added, Recommendations)
+- Both cover images and game titles now link to /games/[id]
+- Added hover effects for visual feedback
 
 ## Code Changes This Session
 
-### Modified Files
-- src/app/api/groups/[id]/dashboard/route.ts
-  - Added PrivacyPreference interface
-  - Fetch privacy preferences for all group members
-  - Filter member IDs based on showActivityToGroup setting
-  - Apply privacy filters to nowPlaying, mostWanted, recentlyAdded
-  - Filter ratings/notes based on individual user preferences
+### New Files
+- src/app/api/cache/clear/route.ts - Dev endpoint to clear game caches
+- scripts/update-game-modes.js - Script to update existing games with gameModes
+- scripts/check-game-modes.js - Script to verify game modes in database
+- scripts/find-elden-ring.js - Helper script to find game IDs
 
-### Already Existing Files (used for privacy)
-- src/app/api/users/me/privacy/route.ts - GET/PATCH privacy preferences
-- src/app/settings/page.tsx - Privacy tab UI with checkboxes
+### Modified Files
+- README.md - Added API Keys Setup Guide section
+- prisma/schema.prisma - Added gameModes and playerCount to Game model
+- src/app/api/games/[id]/route.ts - Used raw SQL for gameModes/playerCount fields
+- src/app/api/games/search/route.ts - Added gameModes/playerCount to sample data
+- src/app/games/[id]/page.tsx - Added Players section UI
+- src/app/me/page.tsx - Made game cards and titles clickable links
+- src/app/dashboard/page.tsx - Made game entries clickable links
+- src/app/groups/[id]/page.tsx - Made all game displays clickable links
+- .env - Updated NEXTAUTH_URL to port 3006
+
+## Remaining Features (6 total - all require external dependencies)
+
+1. **Feature #151: Tier Ranking** - Complex new feature
+2. **Feature #152: Discord Integration** - Requires Discord API setup
+3. **Feature #153: Search for Deals** - Requires multiple external APIs
+4. **Feature #154: Game Trailers** - Requires YouTube/video API
+5. **Feature #155: Docker Setup** - Docker daemon not running
+6. **Feature #71: Google OAuth** - Requires Google credentials
 
 ## Test Users
-- test@example.com / testpass123 (Test User) - Group member/admin
-- second@example.com / testpass123 (Second User) - Group owner/admin
+- test@example.com / password123 (Test User)
+- second@example.com / testpass123 (Second User)
 
 ## Server
-- Development server: http://localhost:3001 (port 3000 in use)
+- Development server: http://localhost:3006
 - Start with: npm run dev
 
 ## Database
 - SQLite: prisma/dev.db
-- UserPrivacyPreference table stores privacy settings
-
-## What To Work On Next
-- Feature #124 and beyond
-- Continue with remaining functional features
-- Current progress: 136/156 (87.2%)
-- Nearing completion!
+- Game table now includes gameModes (JSON string) and playerCount fields
 
 ## Architecture Notes
-- Privacy preferences stored in UserPrivacyPreference table
-- Dashboard API fetches privacy settings for all group members
-- Privacy filtering applied server-side (secure - can't bypass via client)
-- Default privacy settings used if user hasn't set preferences:
-  - showActivityToGroup: true
-  - showGameStatus: true
-  - showRatings: true
-  - showNotes: false (private by default)
-  - showOnlineStatus: true
-  - allowGroupInvites: true
+- In-memory cache with 24-hour TTL for game details
+- Raw SQL queries used to bypass Prisma client type caching issues
+- Game cards use Next.js Link component for client-side navigation
+- Privacy filtering applied server-side in group dashboard API

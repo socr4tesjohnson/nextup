@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { Suspense, useEffect, useState } from "react"
 import { useSession } from "next-auth/react"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
@@ -86,7 +86,7 @@ const SORT_OPTIONS = [
   { value: "rating_asc", label: "Rating (Lowest)" },
 ]
 
-export default function MyListsPage() {
+function MyListsPageContent() {
   const { data: session, status: sessionStatus } = useSession()
   const searchParams = useSearchParams()
   const [entries, setEntries] = useState<GameEntry[]>([])
@@ -459,26 +459,30 @@ export default function MyListsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {sortedEntries.map((entry) => (
                 <Card key={entry.id} className="overflow-hidden">
-                  <div className="aspect-[3/4] relative bg-muted">
-                    {entry.game.coverUrl ? (
-                      <img
-                        src={entry.game.coverUrl}
-                        alt={entry.game.name}
-                        className="object-cover w-full h-full"
-                      />
-                    ) : (
-                      <div className="flex items-center justify-center w-full h-full text-muted-foreground">
-                        No Image
+                  <Link href={`/games/${entry.game.id}`} className="block">
+                    <div className="aspect-[3/4] relative bg-muted hover:opacity-90 transition-opacity">
+                      {entry.game.coverUrl ? (
+                        <img
+                          src={entry.game.coverUrl}
+                          alt={entry.game.name}
+                          className="object-cover w-full h-full"
+                        />
+                      ) : (
+                        <div className="flex items-center justify-center w-full h-full text-muted-foreground">
+                          No Image
+                        </div>
+                      )}
+                      <div className={`absolute top-2 right-2 px-2 py-1 rounded text-xs font-medium ${STATUS_COLORS[entry.status] || "bg-primary text-primary-foreground"}`}>
+                        {STATUS_LABELS[entry.status] || entry.status}
                       </div>
-                    )}
-                    <div className={`absolute top-2 right-2 px-2 py-1 rounded text-xs font-medium ${STATUS_COLORS[entry.status] || "bg-primary text-primary-foreground"}`}>
-                      {STATUS_LABELS[entry.status] || entry.status}
                     </div>
-                  </div>
+                  </Link>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-lg line-clamp-1">
-                      {entry.game.name}
-                    </CardTitle>
+                    <Link href={`/games/${entry.game.id}`} className="hover:text-primary transition-colors">
+                      <CardTitle className="text-lg line-clamp-1">
+                        {entry.game.name}
+                      </CardTitle>
+                    </Link>
                     {entry.game.firstReleaseDate && (
                       <CardDescription>
                         {new Date(entry.game.firstReleaseDate).getFullYear()}
@@ -685,5 +689,27 @@ export default function MyListsPage() {
         )}
       </main>
     </div>
+  )
+}
+
+export default function MyListsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto px-4 py-8">
+          <div className="animate-pulse">
+            <div className="h-8 bg-muted rounded w-1/4 mb-4"></div>
+            <div className="h-4 bg-muted rounded w-1/2 mb-8"></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-48 bg-muted rounded-lg"></div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    }>
+      <MyListsPageContent />
+    </Suspense>
   )
 }

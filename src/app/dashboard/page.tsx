@@ -143,12 +143,12 @@ export default function DashboardPage() {
               ) : stats.nowPlaying.length > 0 ? (
                 <div className="space-y-2">
                   {stats.nowPlaying.slice(0, 3).map(entry => (
-                    <div key={entry.id} className="flex items-center gap-2">
+                    <Link key={entry.id} href={`/games/${entry.game.id}`} className="flex items-center gap-2 hover:bg-muted p-1 -mx-1 rounded transition-colors">
                       {entry.game.coverUrl && (
                         <img src={entry.game.coverUrl} alt="" className="w-8 h-10 object-cover rounded" />
                       )}
                       <span className="text-sm truncate">{entry.game.name}</span>
-                    </div>
+                    </Link>
                   ))}
                   {stats.nowPlaying.length > 3 && (
                     <p className="text-sm text-muted-foreground">
@@ -197,12 +197,12 @@ export default function DashboardPage() {
               ) : stats.wishlist.length > 0 ? (
                 <div className="space-y-2">
                   {stats.wishlist.slice(0, 3).map(entry => (
-                    <div key={entry.id} className="flex items-center gap-2">
+                    <Link key={entry.id} href={`/games/${entry.game.id}`} className="flex items-center gap-2 hover:bg-muted p-1 -mx-1 rounded transition-colors">
                       {entry.game.coverUrl && (
                         <img src={entry.game.coverUrl} alt="" className="w-8 h-10 object-cover rounded" />
                       )}
                       <span className="text-sm truncate">{entry.game.name}</span>
-                    </div>
+                    </Link>
                   ))}
                   {stats.wishlist.length > 3 && (
                     <p className="text-sm text-muted-foreground">

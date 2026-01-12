@@ -22,6 +22,7 @@ const navItems = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/groups", label: "Groups" },
   { href: "/me", label: "My Lists" },
+  { href: "/tier-lists", label: "Tier Rankings" },
   { href: "/search", label: "Search" },
   { href: "/settings", label: "Settings" },
 ]

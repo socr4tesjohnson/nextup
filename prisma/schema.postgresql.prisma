@@ -1,12 +1,13 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// This is your Prisma schema file for PostgreSQL
+// Use this when running with Docker/PostgreSQL
+// Copy this to schema.prisma when deploying to production
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -42,12 +43,12 @@ model Account {
   type              String
   provider          String
   providerAccountId String
-  refresh_token     String?
-  access_token      String?
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String?
+  id_token          String? @db.Text
   session_state     String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -126,7 +127,7 @@ model Game {
   providerGameId   String
   name             String
   slug             String
-  description      String?
+  description      String?   @db.Text
   coverUrl         String?
   bannerUrl        String?
   firstReleaseDate DateTime?
@@ -134,8 +135,6 @@ model Game {
   platforms        String    @default("[]")
   franchises       String    @default("[]")
   themes           String    @default("[]")
-  gameModes        String    @default("[]")  // ["Single player", "Multiplayer", "Co-op", etc.]
-  playerCount      String?                    // e.g., "1", "1-4", "2-8 online"
   rating           Float?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
@@ -160,7 +159,7 @@ model UserGameEntry {
   status     String
   platform   String?
   rating     Int?
-  notes      String?
+  notes      String?   @db.Text
   startedAt  DateTime?
   finishedAt DateTime?
   createdAt  DateTime  @default(now())
@@ -182,7 +181,7 @@ model GroupInterestProfile {
   id         String   @id @default(cuid())
   groupId    String   @unique
   computedAt DateTime @default(now())
-  signals    String
+  signals    String   @db.Text
   updatedAt  DateTime @updatedAt
 
   // Relations
@@ -195,7 +194,7 @@ model GroupRecommendation {
   gameId             String
   recommendationType String   @default("UPCOMING")
   score              Float
-  reason             String
+  reason             String   @db.Text
   dismissedBy        String   @default("[]")
   createdAt          DateTime @default(now())
 
@@ -250,7 +249,7 @@ model Notification {
   userId    String
   type      String   // "deal_alert", "group_invite", "friend_activity", etc.
   title     String
-  message   String
+  message   String   @db.Text
   link      String?  // Optional URL to navigate to
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
@@ -296,41 +295,4 @@ model UserPrivacyPreference {
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-// ============================================================================
-// Tier Rankings
-// ============================================================================
-
-model TierList {
-  id          String   @id @default(cuid())
-  name        String
-  description String?
-  userId      String?  // User who created this tier list (null for group tier lists)
-  groupId     String?  // Group this tier list belongs to (null for personal tier lists)
-  isPublic    Boolean  @default(false)  // Whether this tier list is visible to others
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relations
-  games TierListGame[]
-
-  @@index([userId])
-  @@index([groupId])
-  @@index([isPublic])
-}
-
-model TierListGame {
-  id         String   @id @default(cuid())
-  tierListId String
-  gameId     String
-  tier       String   // S, A, B, C, D, F
-  position   Int      // Order within the tier
-  createdAt  DateTime @default(now())
-
-  // Relations
-  tierList TierList @relation(fields: [tierListId], references: [id], onDelete: Cascade)
-
-  @@unique([tierListId, gameId])
-  @@index([tierListId])
 }

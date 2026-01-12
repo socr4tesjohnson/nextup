@@ -482,10 +482,10 @@ export default function GroupDetailPage() {
               {dashboard?.nowPlaying && filterByPlatform(dashboard.nowPlaying).length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {filterByPlatform(dashboard.nowPlaying).map((entry) => (
-                    <div
+                    <Link
                       key={entry.id}
-                      className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted/80 transition-colors"
-                      onClick={() => setSelectedGame(entry.game)}
+                      href={`/games/${entry.game.id}`}
+                      className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted/80 transition-colors"
                     >
                       {entry.game.coverUrl ? (
                         <img
@@ -509,7 +509,7 @@ export default function GroupDetailPage() {
                           </span>
                         </div>
                       </div>
-                    </div>
+                    </Link>
                   ))}
                 </div>
               ) : (
@@ -654,7 +654,7 @@ export default function GroupDetailPage() {
               {dashboard?.mostWanted && dashboard.mostWanted.length > 0 ? (
                 <div className="space-y-3">
                   {dashboard.mostWanted.map((item) => (
-                    <div key={item.game.id} className="flex items-center gap-3">
+                    <Link key={item.game.id} href={`/games/${item.game.id}`} className="flex items-center gap-3 hover:bg-muted/50 p-2 -mx-2 rounded-lg transition-colors">
                       {item.game.coverUrl ? (
                         <img
                           src={item.game.coverUrl}
@@ -672,7 +672,7 @@ export default function GroupDetailPage() {
                           {item.count} {item.count === 1 ? "person wants" : "people want"} this
                         </p>
                       </div>
-                    </div>
+                    </Link>
                   ))}
                 </div>
               ) : (
@@ -691,7 +691,7 @@ export default function GroupDetailPage() {
               {dashboard?.recentlyAdded && dashboard.recentlyAdded.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {dashboard.recentlyAdded.slice(0, 6).map((entry) => (
-                    <div key={entry.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                    <Link key={entry.id} href={`/games/${entry.game.id}`} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted/80 transition-colors">
                       {entry.game.coverUrl ? (
                         <img
                           src={entry.game.coverUrl}
@@ -717,7 +717,7 @@ export default function GroupDetailPage() {
                           </span>
                         </div>
                       </div>
-                    </div>
+                    </Link>
                   ))}
                 </div>
               ) : (
@@ -754,11 +754,11 @@ export default function GroupDetailPage() {
               {filteredRecommendations.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {filteredRecommendations.map((rec) => (
-                    <div key={rec.id} className="relative flex items-start gap-3 p-3 rounded-lg bg-muted/50">
+                    <div key={rec.id} className="relative flex items-start gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted/80 transition-colors">
                       <button
-                        onClick={() => handleDismissRecommendation(rec.id)}
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDismissRecommendation(rec.id); }}
                         disabled={dismissingRec === rec.id}
-                        className="absolute top-2 right-2 w-6 h-6 rounded-full bg-background/80 hover:bg-destructive hover:text-destructive-foreground flex items-center justify-center text-muted-foreground transition-colors"
+                        className="absolute top-2 right-2 w-6 h-6 rounded-full bg-background/80 hover:bg-destructive hover:text-destructive-foreground flex items-center justify-center text-muted-foreground transition-colors z-10"
                         title="Dismiss recommendation"
                       >
                         {dismissingRec === rec.id ? (
@@ -767,29 +767,31 @@ export default function GroupDetailPage() {
                           "×"
                         )}
                       </button>
-                      {rec.game.coverUrl ? (
-                        <img
-                          src={rec.game.coverUrl}
-                          alt={rec.game.name}
-                          className="w-12 h-16 object-cover rounded"
-                        />
-                      ) : (
-                        <div className="w-12 h-16 bg-muted rounded flex items-center justify-center text-xs text-muted-foreground">
-                          No img
+                      <Link href={`/games/${rec.game.id}`} className="flex items-start gap-3 flex-1">
+                        {rec.game.coverUrl ? (
+                          <img
+                            src={rec.game.coverUrl}
+                            alt={rec.game.name}
+                            className="w-12 h-16 object-cover rounded"
+                          />
+                        ) : (
+                          <div className="w-12 h-16 bg-muted rounded flex items-center justify-center text-xs text-muted-foreground">
+                            No img
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0 pr-6">
+                          <p className="font-medium truncate">{rec.game.name}</p>
+                          <p className="text-xs text-muted-foreground mt-1">{rec.reason}</p>
+                          <div className="flex items-center gap-2 mt-2">
+                            <span className="text-xs px-2 py-0.5 rounded bg-primary/10 text-primary">
+                              {Math.round(rec.score * 100)}% match
+                            </span>
+                            <span className="text-xs text-muted-foreground capitalize">
+                              {rec.recommendationType.toLowerCase().replace("_", " ")}
+                            </span>
+                          </div>
                         </div>
-                      )}
-                      <div className="flex-1 min-w-0 pr-6">
-                        <p className="font-medium truncate">{rec.game.name}</p>
-                        <p className="text-xs text-muted-foreground mt-1">{rec.reason}</p>
-                        <div className="flex items-center gap-2 mt-2">
-                          <span className="text-xs px-2 py-0.5 rounded bg-primary/10 text-primary">
-                            {Math.round(rec.score * 100)}% match
-                          </span>
-                          <span className="text-xs text-muted-foreground capitalize">
-                            {rec.recommendationType.toLowerCase().replace("_", " ")}
-                          </span>
-                        </div>
-                      </div>
+                      </Link>
                     </div>
                   ))}
                 </div>

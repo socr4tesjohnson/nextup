@@ -117,6 +117,108 @@ nextup/
 | `GOOGLE_CLIENT_SECRET` | Google OAuth secret | Optional |
 | `SMTP_*` | Email configuration | Optional |
 
+## API Keys Setup Guide
+
+### Required API Keys
+
+#### 1. IGDB (Twitch) - Game Database
+**Required for:** Game search, game details, upcoming releases
+
+1. Go to https://dev.twitch.tv/console
+2. Log in with your Twitch account (create one if needed)
+3. Click "Register Your Application"
+4. Fill in:
+   - Name: "NextUp" (or your app name)
+   - OAuth Redirect URLs: `http://localhost:3000` (for development)
+   - Category: "Website Integration"
+5. Click "Create"
+6. Copy your **Client ID** → `TWITCH_CLIENT_ID`
+7. Click "New Secret" and copy it → `TWITCH_CLIENT_SECRET`
+
+**Note:** IGDB uses Twitch authentication. The tokens auto-refresh, no manual renewal needed.
+
+#### 2. IsThereAnyDeal (ITAD) - Game Deals
+**Required for:** Price comparisons, deal alerts, historical price data
+
+1. Go to https://isthereanydeal.com/dev/app/
+2. Create an account or log in
+3. Click "Create new app"
+4. Fill in your app details
+5. Copy your API key → `ITAD_API_KEY`
+
+**Note:** Free tier has rate limits. Check their docs for current limits.
+
+### Optional API Keys
+
+#### 3. Google OAuth - Social Login
+**Required for:** "Sign in with Google" functionality
+
+1. Go to https://console.cloud.google.com/
+2. Create a new project (or select existing)
+3. Navigate to "APIs & Services" → "Credentials"
+4. Click "Create Credentials" → "OAuth client ID"
+5. Configure the OAuth consent screen if prompted
+6. Select "Web application" as application type
+7. Add Authorized redirect URIs:
+   - Development: `http://localhost:3000/api/auth/callback/google`
+   - Production: `https://yourdomain.com/api/auth/callback/google`
+8. Copy credentials:
+   - Client ID → `GOOGLE_CLIENT_ID`
+   - Client Secret → `GOOGLE_CLIENT_SECRET`
+
+#### 4. SMTP - Email Notifications
+**Required for:** Password reset emails, deal alerts, notifications
+
+You can use any SMTP provider. Common options:
+
+**SendGrid (Free tier: 100 emails/day)**
+1. Sign up at https://sendgrid.com/
+2. Go to Settings → API Keys → Create API Key
+3. Configure:
+   - `SMTP_HOST=smtp.sendgrid.net`
+   - `SMTP_PORT=587`
+   - `SMTP_USER=apikey`
+   - `SMTP_PASSWORD=your_api_key`
+
+**Gmail (For development)**
+1. Enable 2FA on your Google account
+2. Go to https://myaccount.google.com/apppasswords
+3. Generate an app password
+4. Configure:
+   - `SMTP_HOST=smtp.gmail.com`
+   - `SMTP_PORT=587`
+   - `SMTP_USER=your_email@gmail.com`
+   - `SMTP_PASSWORD=your_app_password`
+
+**Mailgun, Postmark, AWS SES** - Similar setup, check their documentation.
+
+### Development Without API Keys
+
+The app can run in a limited mode without external API keys:
+
+- **Without IGDB**: Game search uses sample/cached data
+- **Without ITAD**: Deal features disabled, no price comparisons
+- **Without Google OAuth**: Only email/password login available
+- **Without SMTP**: Emails logged to console instead of sent
+
+### Verifying Your Setup
+
+After configuring API keys, test each integration:
+
+```bash
+# Start the dev server
+npm run dev
+
+# Test IGDB - Search should return real results
+# Visit: http://localhost:3000/search and search for a game
+
+# Test Google OAuth - Should show Google button
+# Visit: http://localhost:3000/login
+
+# Test SMTP - Should log or send email
+# Visit: http://localhost:3000/forgot-password
+```
+
 ## Background Jobs
 
 The application uses BullMQ for scheduled jobs:

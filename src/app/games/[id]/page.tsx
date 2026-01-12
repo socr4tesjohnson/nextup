@@ -21,6 +21,8 @@ interface Game {
   genres: string[]
   platforms: string[]
   themes: string[]
+  gameModes: string[]
+  playerCount: string | null
   rating: number | null
 }
 
@@ -490,6 +492,38 @@ export default function GameDetailPage() {
                 </div>
               </div>
             )}
+
+            {/* Game Modes / Player Count Section */}
+            {(game.gameModes && game.gameModes.length > 0) || game.playerCount ? (
+              <div>
+                <h2 className="text-lg font-semibold mb-2">Players</h2>
+                <div className="flex flex-wrap items-center gap-3">
+                  {game.gameModes && game.gameModes.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {game.gameModes.map((mode) => (
+                        <span
+                          key={mode}
+                          className={`px-3 py-1 rounded-full text-sm font-medium ${
+                            mode.toLowerCase().includes("single")
+                              ? "bg-blue-500/20 text-blue-600 dark:text-blue-400"
+                              : mode.toLowerCase().includes("co-op") || mode.toLowerCase().includes("coop")
+                              ? "bg-green-500/20 text-green-600 dark:text-green-400"
+                              : "bg-purple-500/20 text-purple-600 dark:text-purple-400"
+                          }`}
+                        >
+                          {mode}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {game.playerCount && (
+                    <span className="text-muted-foreground text-sm">
+                      {game.playerCount === "1" ? "1 player" : `${game.playerCount} players`}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ) : null}
 
             {formattedReleaseDate && (
               <div>

@@ -52,9 +52,31 @@ export async function GET(
 
     console.log(`[Cache MISS] Game detail: "${gameId}"`)
 
-    const game = await prisma.game.findUnique({
-      where: { id: gameId }
-    })
+    // Use raw query to get all fields including gameModes and playerCount
+    // This bypasses any Prisma client caching issues
+    const games = await prisma.$queryRaw<Array<{
+      id: string
+      name: string
+      slug: string
+      description: string | null
+      coverUrl: string | null
+      bannerUrl: string | null
+      firstReleaseDate: Date | null
+      genres: string
+      platforms: string
+      themes: string
+      gameModes: string
+      playerCount: string | null
+      rating: number | null
+    }>>`
+      SELECT id, name, slug, description, coverUrl, bannerUrl, firstReleaseDate,
+             genres, platforms, themes, gameModes, playerCount, rating
+      FROM Game
+      WHERE id = ${gameId}
+      LIMIT 1
+    `
+
+    const game = games[0]
 
     if (!game) {
       return NextResponse.json({ error: "Game not found" }, { status: 404 })
@@ -71,6 +93,8 @@ export async function GET(
       genres: game.genres ? JSON.parse(game.genres) : [],
       platforms: game.platforms ? JSON.parse(game.platforms) : [],
       themes: game.themes ? JSON.parse(game.themes) : [],
+      gameModes: game.gameModes ? JSON.parse(game.gameModes) : [],
+      playerCount: game.playerCount,
       rating: game.rating
     }
 

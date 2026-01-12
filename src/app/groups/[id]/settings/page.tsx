@@ -348,7 +348,7 @@ export default function GroupSettingsPage() {
     }
   }
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string | Date | null | undefined) => {
     if (!dateString) return '—'
     try {
       return new Date(dateString).toLocaleDateString('en-US', {

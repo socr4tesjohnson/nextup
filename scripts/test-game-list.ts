@@ -20,16 +20,23 @@ async function test() {
 
     // Create a test game
     const game = await prisma.game.upsert({
-      where: { igdbId: 999 },
+      where: {
+        provider_providerGameId: {
+          provider: 'TEST',
+          providerGameId: '999'
+        }
+      },
       update: {},
       create: {
-        igdbId: 999,
+        provider: 'TEST',
+        providerGameId: '999',
         name: 'Test Game for List Feature',
+        slug: 'test-game-for-list-feature',
         coverUrl: null,
         firstReleaseDate: new Date('2024-01-01'),
         genres: JSON.stringify(['Test']),
         platforms: JSON.stringify(['PC']),
-        summary: 'A test game for the list feature'
+        description: 'A test game for the list feature'
       }
     })
     console.log('Test game:', game.id, game.name)
