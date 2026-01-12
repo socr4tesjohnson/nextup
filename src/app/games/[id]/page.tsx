@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react"
 import { useSession } from "next-auth/react"
 import Link from "next/link"
-import { useParams } from "next/navigation"
+import { useParams, useSearchParams } from "next/navigation"
 import { Header } from "@/components/layout/header"
+import { Breadcrumb } from "@/components/ui/breadcrumb"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
@@ -31,7 +32,49 @@ interface Deal {
   discountPercent: number
   url: string
   isHistoricalLow: boolean
+  historicalLowPrice?: number
   region: string
+  fetchedAt?: string
+}
+
+interface PriceHistoryEntry {
+  date: string
+  price: number
+  store: string
+}
+
+interface SimilarGame {
+  id: string
+  name: string
+  slug: string
+  coverUrl: string | null
+  rating: number | null
+  genres: string[]
+  matchReason: string
+}
+
+interface UserEntry {
+  id: string
+  status: string
+  platform: string | null
+  rating: number | null
+  notes: string | null
+  startedAt: string | null
+  finishedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+interface GroupMemberStatus {
+  user: {
+    id: string
+    name: string | null
+    image: string | null
+  }
+  status: string
+  rating: number | null
+  platform: string | null
+  groups: { id: string; name: string }[]
 }
 
 const STATUS_OPTIONS = [
@@ -46,13 +89,27 @@ const STATUS_OPTIONS = [
 export default function GameDetailPage() {
   const { data: session } = useSession()
   const params = useParams()
+  const searchParams = useSearchParams()
   const gameId = params.id as string
+
+  // Get group context from URL params for breadcrumb navigation
+  const fromGroup = searchParams.get("from") === "group"
+  const groupId = searchParams.get("groupId")
+  const groupName = searchParams.get("groupName")
 
   const [game, setGame] = useState<Game | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [deals, setDeals] = useState<Deal[]>([])
   const [dealsLoading, setDealsLoading] = useState(true)
+  const [priceHistory, setPriceHistory] = useState<PriceHistoryEntry[]>([])
+  const [lowestEverPrice, setLowestEverPrice] = useState<number | null>(null)
+  const [lowestEverStore, setLowestEverStore] = useState<string | null>(null)
+  const [similarGames, setSimilarGames] = useState<SimilarGame[]>([])
+  const [similarLoading, setSimilarLoading] = useState(true)
+  const [userEntry, setUserEntry] = useState<UserEntry | null>(null)
+  const [groupStatuses, setGroupStatuses] = useState<GroupMemberStatus[]>([])
+  const [groupStatusesLoading, setGroupStatusesLoading] = useState(true)
 
   // Add to list modal state
   const [showAddModal, setShowAddModal] = useState(false)
@@ -63,6 +120,18 @@ export default function GameDetailPage() {
   const [platform, setPlatform] = useState("")
   const [addError, setAddError] = useState("")
   const [addSuccess, setAddSuccess] = useState("")
+
+  // Handle Escape key to close modal
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && showAddModal) {
+        setShowAddModal(false)
+        setAddError("")
+      }
+    }
+    document.addEventListener("keydown", handleEscape)
+    return () => document.removeEventListener("keydown", handleEscape)
+  }, [showAddModal])
 
   useEffect(() => {
     async function fetchGame() {
@@ -76,6 +145,7 @@ export default function GameDetailPage() {
         }
 
         setGame(data.game)
+        setUserEntry(data.userEntry || null)
       } catch (err) {
         setError("Failed to load game")
       } finally {
@@ -91,6 +161,13 @@ export default function GameDetailPage() {
         if (response.ok && data.deals) {
           setDeals(data.deals)
         }
+        if (response.ok && data.priceHistory) {
+          setPriceHistory(data.priceHistory)
+        }
+        if (response.ok && data.lowestEverPrice !== undefined) {
+          setLowestEverPrice(data.lowestEverPrice)
+          setLowestEverStore(data.lowestEverStore || null)
+        }
       } catch (err) {
         console.error("Failed to load deals:", err)
       } finally {
@@ -98,8 +175,40 @@ export default function GameDetailPage() {
       }
     }
 
+    async function fetchSimilarGames() {
+      try {
+        const response = await fetch(`/api/games/${gameId}/similar`)
+        const data = await response.json()
+
+        if (response.ok && data.similarGames) {
+          setSimilarGames(data.similarGames)
+        }
+      } catch (err) {
+        console.error("Failed to load similar games:", err)
+      } finally {
+        setSimilarLoading(false)
+      }
+    }
+
+    async function fetchGroupStatuses() {
+      try {
+        const response = await fetch(`/api/games/${gameId}/group-statuses`)
+        const data = await response.json()
+
+        if (response.ok && data.groupStatuses) {
+          setGroupStatuses(data.groupStatuses)
+        }
+      } catch (err) {
+        console.error("Failed to load group statuses:", err)
+      } finally {
+        setGroupStatusesLoading(false)
+      }
+    }
+
     fetchGame()
     fetchDeals()
+    fetchSimilarGames()
+    fetchGroupStatuses()
   }, [gameId])
 
   const handleAddToList = async (e: React.FormEvent) => {
@@ -191,12 +300,21 @@ export default function GameDetailPage() {
       <Header />
 
       <main className="container mx-auto px-4 py-8">
-        <Link
-          href="/search"
-          className="text-sm text-muted-foreground hover:text-primary mb-4 block"
-        >
-          ← Back to Search
-        </Link>
+        <Breadcrumb
+          items={
+            fromGroup && groupId && groupName
+              ? [
+                  { label: "Groups", href: "/groups" },
+                  { label: groupName, href: `/groups/${groupId}` },
+                  { label: game.name }
+                ]
+              : [
+                  { label: "Search", href: "/search" },
+                  { label: game.name }
+                ]
+          }
+          className="mb-4"
+        />
 
         {addSuccess && (
           <div className="mb-4 p-3 rounded-md bg-green-500/10 text-green-600 text-sm">
@@ -221,19 +339,90 @@ export default function GameDetailPage() {
               )}
             </div>
 
-            <Button
-              className="w-full mt-4"
-              onClick={() => {
-                setSelectedStatus("NOW_PLAYING")
-                setNotes("")
-                setRating("")
-                setPlatform("")
-                setAddError("")
-                setShowAddModal(true)
-              }}
-            >
-              Add to My List
-            </Button>
+            {userEntry ? (
+              <div className="mt-4 p-4 rounded-lg bg-primary/10 border border-primary/20">
+                <h3 className="font-semibold text-primary mb-2">Your Status</h3>
+                <div className="space-y-1 text-sm">
+                  <p>
+                    <span className="text-muted-foreground">Status: </span>
+                    <span className="font-medium">
+                      {STATUS_OPTIONS.find(s => s.value === userEntry.status)?.label || userEntry.status}
+                    </span>
+                  </p>
+                  {userEntry.rating && (
+                    <p>
+                      <span className="text-muted-foreground">Rating: </span>
+                      <span className="font-medium">{userEntry.rating}/10</span>
+                    </p>
+                  )}
+                  {userEntry.platform && (
+                    <p>
+                      <span className="text-muted-foreground">Platform: </span>
+                      <span className="font-medium">{userEntry.platform}</span>
+                    </p>
+                  )}
+                  {userEntry.notes && (
+                    <p className="mt-2">
+                      <span className="text-muted-foreground">Notes: </span>
+                      <span className="italic">{userEntry.notes}</span>
+                    </p>
+                  )}
+                </div>
+                <Link href="/me" className="block mt-3">
+                  <Button variant="outline" size="sm" className="w-full">
+                    Edit in My Lists
+                  </Button>
+                </Link>
+              </div>
+            ) : (
+              <Button
+                className="w-full mt-4"
+                onClick={() => {
+                  setSelectedStatus("NOW_PLAYING")
+                  setNotes("")
+                  setRating("")
+                  setPlatform("")
+                  setAddError("")
+                  setShowAddModal(true)
+                }}
+              >
+                Add to My List
+              </Button>
+            )}
+
+            {/* Group Members' Statuses */}
+            {!groupStatusesLoading && groupStatuses.length > 0 && (
+              <div className="mt-4 p-4 rounded-lg bg-muted/50 border">
+                <h3 className="font-semibold mb-3">Friends Playing</h3>
+                <div className="space-y-3">
+                  {groupStatuses.map((memberStatus) => (
+                    <div key={memberStatus.user.id} className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-sm font-medium overflow-hidden">
+                        {memberStatus.user.image ? (
+                          <img
+                            src={memberStatus.user.image}
+                            alt={memberStatus.user.name || ""}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          memberStatus.user.name?.charAt(0).toUpperCase() || "?"
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {memberStatus.user.name || "Unknown"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {STATUS_OPTIONS.find(s => s.value === memberStatus.status)?.label || memberStatus.status}
+                          {memberStatus.rating && ` • ${memberStatus.rating}/10`}
+                          {memberStatus.platform && ` • ${memberStatus.platform}`}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Game Details */}
@@ -368,13 +557,132 @@ export default function GameDetailPage() {
                 <p className="text-muted-foreground">No deals available for this game.</p>
               )}
             </div>
+
+            {/* Price History Section */}
+            {(priceHistory.length > 0 || lowestEverPrice !== null) && (
+              <div>
+                <h2 className="text-lg font-semibold mb-3">Price History</h2>
+
+                {/* Historical Low Summary */}
+                {lowestEverPrice !== null && (
+                  <div className="mb-4 p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+                    <div className="flex items-center gap-2">
+                      <span className="text-green-600 font-semibold">Historical Low:</span>
+                      <span className="text-xl font-bold text-green-600">${lowestEverPrice.toFixed(2)}</span>
+                      {lowestEverStore && (
+                        <span className="text-sm text-muted-foreground">on {lowestEverStore}</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Price History Timeline */}
+                {priceHistory.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground mb-2">Recent price changes:</p>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {priceHistory.map((entry, index) => {
+                        const date = new Date(entry.date)
+                        const formattedDate = date.toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric"
+                        })
+                        const isLowest = entry.price === lowestEverPrice
+                        return (
+                          <div
+                            key={index}
+                            className={`flex items-center justify-between p-2 rounded ${
+                              isLowest ? "bg-green-500/10" : "bg-muted/30"
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <span className="text-sm text-muted-foreground w-24">{formattedDate}</span>
+                              <span className="text-sm">{entry.store}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className={`font-medium ${isLowest ? "text-green-600" : ""}`}>
+                                ${entry.price.toFixed(2)}
+                              </span>
+                              {isLowest && (
+                                <span className="text-xs px-1.5 py-0.5 rounded bg-green-500/20 text-green-600">
+                                  Lowest
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Similar Games Section */}
+            <div>
+              <h2 className="text-lg font-semibold mb-3">Similar Games</h2>
+              {similarLoading ? (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="animate-pulse">
+                      <div className="aspect-[3/4] bg-muted rounded-lg mb-2"></div>
+                      <div className="h-4 bg-muted rounded w-3/4"></div>
+                    </div>
+                  ))}
+                </div>
+              ) : similarGames.length > 0 ? (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {similarGames.map((similarGame) => (
+                    <Link
+                      key={similarGame.id}
+                      href={`/games/${similarGame.id}`}
+                      className="group block"
+                    >
+                      <div className="aspect-[3/4] relative bg-muted rounded-lg overflow-hidden mb-2 group-hover:ring-2 ring-primary transition-all">
+                        {similarGame.coverUrl ? (
+                          <img
+                            src={similarGame.coverUrl}
+                            alt={similarGame.name}
+                            className="object-cover w-full h-full group-hover:scale-105 transition-transform"
+                          />
+                        ) : (
+                          <div className="flex items-center justify-center w-full h-full text-muted-foreground text-sm">
+                            No Image
+                          </div>
+                        )}
+                      </div>
+                      <h3 className="font-medium text-sm line-clamp-2 group-hover:text-primary transition-colors">
+                        {similarGame.name}
+                      </h3>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {similarGame.matchReason}
+                      </p>
+                      {similarGame.rating && (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {Math.round(similarGame.rating)}/100
+                        </p>
+                      )}
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground">No similar games found in your library.</p>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Add to List Modal */}
         {showAddModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <Card className="w-full max-w-md mx-4">
+          <div
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+            onClick={() => {
+              setShowAddModal(false)
+              setAddError("")
+            }}
+          >
+            <Card className="w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
               <CardHeader>
                 <CardTitle>Add to List</CardTitle>
                 <CardDescription>{game.name}</CardDescription>

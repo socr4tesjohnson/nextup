@@ -18,6 +18,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { Breadcrumb } from "@/components/ui/breadcrumb"
 
 interface GroupMember {
   id: string
@@ -37,6 +38,7 @@ interface Group {
   inviteCode: string
   ownerId: string
   createdAt: string
+  defaultPlatforms: string[]
   owner: {
     id: string
     name: string | null
@@ -122,6 +124,19 @@ export default function GroupDetailPage() {
   const [platformFilter, setPlatformFilter] = useState<string>("all")
   const [recommendations, setRecommendations] = useState<Recommendation[]>([])
   const [dismissingRec, setDismissingRec] = useState<string | null>(null)
+  const [recSortBy, setRecSortBy] = useState<"score" | "release_date">("score")
+  const [refreshing, setRefreshing] = useState(false)
+
+  // Handle Escape key to close modal
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && selectedGame) {
+        setSelectedGame(null)
+      }
+    }
+    document.addEventListener("keydown", handleEscape)
+    return () => document.removeEventListener("keydown", handleEscape)
+  }, [selectedGame])
 
   // Available platforms for filtering
   const platforms = ["all", "PC", "PlayStation 5", "PlayStation 4", "Xbox Series X|S", "Xbox One", "Nintendo Switch", "Steam Deck", "Mobile"]
@@ -139,6 +154,33 @@ export default function GroupDetailPage() {
     })
   }
 
+  // Filter recommendations by platform
+  const filterRecommendationsByPlatform = (recs: Recommendation[]) => {
+    if (platformFilter === "all") return recs
+    return recs.filter(rec => {
+      const gamePlatforms = rec.game.platforms || []
+      return gamePlatforms.some((p: string) =>
+        p.toLowerCase().includes(platformFilter.toLowerCase()) ||
+        platformFilter.toLowerCase().includes(p.toLowerCase())
+      )
+    })
+  }
+
+  // Sort recommendations
+  const sortRecommendations = (recs: Recommendation[]) => {
+    return [...recs].sort((a, b) => {
+      if (recSortBy === "score") {
+        return b.score - a.score // Highest score first
+      } else if (recSortBy === "release_date") {
+        // Sort by release date (soonest first)
+        const dateA = a.game.firstReleaseDate ? new Date(a.game.firstReleaseDate).getTime() : Infinity
+        const dateB = b.game.firstReleaseDate ? new Date(b.game.firstReleaseDate).getTime() : Infinity
+        return dateA - dateB
+      }
+      return 0
+    })
+  }
+
   // Get all members' entries for a specific game
   const getMemberEntriesForGame = (gameId: string) => {
     if (!dashboard) return []
@@ -153,45 +195,59 @@ export default function GroupDetailPage() {
     return Array.from(uniqueEntries.values())
   }
 
+  // Fetch dashboard data function (extracted for reuse)
+  const fetchDashboardData = async (isRefresh = false) => {
+    if (isRefresh) {
+      setRefreshing(true)
+    }
+    try {
+      // Fetch group details, dashboard data, and recommendations in parallel
+      const [groupRes, dashboardRes, recsRes] = await Promise.all([
+        fetch(`/api/groups/${groupId}`),
+        fetch(`/api/groups/${groupId}/dashboard`),
+        fetch(`/api/groups/${groupId}/recommendations`)
+      ])
+
+      const groupData = await groupRes.json()
+      const dashboardData = await dashboardRes.json()
+      const recsData = await recsRes.json()
+
+      if (!groupRes.ok) {
+        setError(groupData.error || "Failed to load group")
+        return
+      }
+
+      setGroup(groupData.group)
+
+      // Set initial platform filter from group's default platforms (only on initial load)
+      if (!isRefresh && groupData.group.defaultPlatforms && groupData.group.defaultPlatforms.length > 0) {
+        // Use the first default platform as the filter
+        setPlatformFilter(groupData.group.defaultPlatforms[0])
+      }
+
+      if (dashboardRes.ok) {
+        setDashboard(dashboardData)
+      }
+
+      if (recsRes.ok && recsData.recommendations) {
+        setRecommendations(recsData.recommendations)
+      }
+    } catch (err) {
+      setError("Failed to load group")
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+    }
+  }
+
   useEffect(() => {
     if (status === "loading") return
-
-    async function fetchData() {
-      try {
-        // Fetch group details, dashboard data, and recommendations in parallel
-        const [groupRes, dashboardRes, recsRes] = await Promise.all([
-          fetch(`/api/groups/${groupId}`),
-          fetch(`/api/groups/${groupId}/dashboard`),
-          fetch(`/api/groups/${groupId}/recommendations`)
-        ])
-
-        const groupData = await groupRes.json()
-        const dashboardData = await dashboardRes.json()
-        const recsData = await recsRes.json()
-
-        if (!groupRes.ok) {
-          setError(groupData.error || "Failed to load group")
-          return
-        }
-
-        setGroup(groupData.group)
-
-        if (dashboardRes.ok) {
-          setDashboard(dashboardData)
-        }
-
-        if (recsRes.ok && recsData.recommendations) {
-          setRecommendations(recsData.recommendations)
-        }
-      } catch (err) {
-        setError("Failed to load group")
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchData()
+    fetchDashboardData()
   }, [groupId, status])
+
+  const handleRefresh = () => {
+    fetchDashboardData(true)
+  }
 
   const handleLeaveGroup = async () => {
     setLeaving(true)
@@ -309,6 +365,7 @@ export default function GroupDetailPage() {
   }
 
   const isAdmin = group.userRole === "ADMIN"
+  const filteredRecommendations = sortRecommendations(filterRecommendationsByPlatform(recommendations))
 
   return (
     <div className="min-h-screen bg-background">
@@ -337,6 +394,13 @@ export default function GroupDetailPage() {
       </header>
 
       <main className="container mx-auto px-4 py-8">
+        <Breadcrumb
+          items={[
+            { label: "Groups", href: "/groups" },
+            { label: group.name }
+          ]}
+          className="mb-4"
+        />
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold mb-2">{group.name}</h1>
@@ -346,6 +410,13 @@ export default function GroupDetailPage() {
             </p>
           </div>
           <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={handleRefresh}
+              disabled={refreshing}
+            >
+              {refreshing ? "Refreshing..." : "Refresh"}
+            </Button>
             {isAdmin && (
               <Link href={`/groups/${group.id}/settings`}>
                 <Button variant="outline">Group Settings</Button>
@@ -514,8 +585,11 @@ export default function GroupDetailPage() {
 
           {/* Game Details Modal */}
           {selectedGame && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-              <Card className="w-full max-w-md mx-4">
+            <div
+              className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+              onClick={() => setSelectedGame(null)}
+            >
+              <Card className="w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
                 <CardHeader>
                   <div className="flex items-start gap-4">
                     {selectedGame.coverUrl ? (
@@ -557,7 +631,10 @@ export default function GroupDetailPage() {
                       <p className="text-muted-foreground text-center py-4">No members have this game</p>
                     )}
                   </div>
-                  <div className="mt-4 flex justify-end">
+                  <div className="mt-4 flex justify-between">
+                    <Link href={`/games/${selectedGame.id}?from=group&groupId=${groupId}&groupName=${encodeURIComponent(group.name)}`}>
+                      <Button>View Game Details</Button>
+                    </Link>
                     <Button variant="outline" onClick={() => setSelectedGame(null)}>
                       Close
                     </Button>
@@ -652,13 +729,31 @@ export default function GroupDetailPage() {
           {/* Upcoming Radar Section */}
           <Card className="lg:col-span-3">
             <CardHeader>
-              <CardTitle>Upcoming Radar</CardTitle>
-              <CardDescription>Game recommendations based on your group's interests</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Upcoming Radar</CardTitle>
+                  <CardDescription>Game recommendations based on your group's interests</CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label htmlFor="rec-sort" className="text-sm font-medium whitespace-nowrap">
+                    Sort by:
+                  </label>
+                  <select
+                    id="rec-sort"
+                    value={recSortBy}
+                    onChange={(e) => setRecSortBy(e.target.value as "score" | "release_date")}
+                    className="p-2 border rounded-md bg-background text-sm"
+                  >
+                    <option value="score">Match Score</option>
+                    <option value="release_date">Release Date</option>
+                  </select>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              {recommendations.length > 0 ? (
+              {filteredRecommendations.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {recommendations.map((rec) => (
+                  {filteredRecommendations.map((rec) => (
                     <div key={rec.id} className="relative flex items-start gap-3 p-3 rounded-lg bg-muted/50">
                       <button
                         onClick={() => handleDismissRecommendation(rec.id)}
@@ -699,7 +794,11 @@ export default function GroupDetailPage() {
                   ))}
                 </div>
               ) : (
-                <p className="text-muted-foreground">No recommendations yet. Add more games to your lists to get personalized recommendations!</p>
+                <p className="text-muted-foreground">
+                  {platformFilter === "all"
+                    ? "No recommendations yet. Add more games to your lists to get personalized recommendations!"
+                    : `No recommendations for ${platformFilter} platform.`}
+                </p>
               )}
             </CardContent>
           </Card>
