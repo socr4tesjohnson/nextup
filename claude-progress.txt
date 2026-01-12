@@ -1,8 +1,8 @@
 # NextUp Development Progress
 
-## Last Updated: Session 8
+## Last Updated: Session 9
 
-## Current Status: 83/155 features passing (53.5%)
+## Current Status: 136/156 features passing (87.2%)
 
 ## Completed Features
 
@@ -40,67 +40,53 @@
 - Generate shareable invite link
 
 ### Session 8: Features #81-86
+- Game caching works (in-memory with TTL)
+- Add game to list saves to database
+- Now Playing section shows correct games
+- Most Wanted section aggregates wishlists
+- Recently Added shows latest entries
+- Click game shows member statuses
 
-#### Feature #81: Game caching works - PASSING
-- Implemented in-memory cache with TTL support
-- Search results cached for 5 minutes
-- Game details cached for 24 hours
-- Cache HIT/MISS logged to console
-- Verified faster response on repeat searches
+### Session 9: Feature #123
 
-#### Feature #82: Add game to list saves to database - PASSING
-- Game upsert on add creates database record
-- Games have internal UUIDs
-- Other users can see same game in shared context
-- Verified by searching as different user
-
-#### Feature #83: Now Playing section shows correct games - PASSING
-- Group dashboard shows Now Playing games
-- User avatars displayed next to games
-- Real-time data from group members
-
-#### Feature #84: Most Wanted section aggregates wishlists - PASSING
-- Wishlisted games aggregated by vote count
-- Shows "X people want this" for multiple users
-- Verified by adding same game to wishlist from two users
-
-#### Feature #85: Recently Added shows latest entries - PASSING
-- Recent entries sorted by createdAt desc
-- New additions appear at top
-- Shows user who added and status
-
-#### Feature #86: Click game shows member statuses - PASSING
-- Added clickable game cards in Now Playing
-- Modal shows all members who have the game
-- Each member's status displayed (Now Playing, Finished, etc.)
-- Close button to dismiss modal
+#### Feature #123: Privacy settings control visibility - PASSING
+- Privacy tab exists in Settings page with toggles for:
+  - Show Activity to Group
+  - Show Game Status
+  - Show Ratings
+  - Show Notes
+  - Show Online Status
+  - Allow Group Invites
+- Settings persist to database (UserPrivacyPreference table)
+- Updated group dashboard API to filter data based on privacy settings
+- When "Show Activity to Group" is disabled:
+  - User's games don't appear in Now Playing section
+  - User's wishlist entries don't count in Most Wanted
+  - User's entries don't appear in Recently Added
+- Ratings and notes are filtered based on individual user preferences
+- User's own data always visible regardless of settings
+- Verified with browser automation:
+  - Changed Test User's "Show Activity to Group" to OFF
+  - Logged in as Second User
+  - Confirmed Test User's games were hidden from group dashboard
 
 ## Code Changes This Session
 
-### New Files
-- src/lib/cache.ts - In-memory cache with TTL support
-  - Cache key generators
-  - TTL values (5min search, 24hr details)
-  - Automatic cleanup of expired entries
-
 ### Modified Files
-- src/app/api/games/search/route.ts
-  - Added cache check before database query
-  - Cache results after successful search
-  - Returns cached: true/false in response
+- src/app/api/groups/[id]/dashboard/route.ts
+  - Added PrivacyPreference interface
+  - Fetch privacy preferences for all group members
+  - Filter member IDs based on showActivityToGroup setting
+  - Apply privacy filters to nowPlaying, mostWanted, recentlyAdded
+  - Filter ratings/notes based on individual user preferences
 
-- src/app/api/games/[id]/route.ts
-  - Added cache for game details
-  - 24-hour TTL for game info
-
-- src/app/groups/[id]/page.tsx
-  - Made game cards clickable in Now Playing
-  - Added Game Details Modal
-  - Shows all members with game and their status
+### Already Existing Files (used for privacy)
+- src/app/api/users/me/privacy/route.ts - GET/PATCH privacy preferences
+- src/app/settings/page.tsx - Privacy tab UI with checkboxes
 
 ## Test Users
-- test@example.com / testpass123 (Test User) - Group owner
-- second@example.com / testpass123 (Second User) - Group member/admin
+- test@example.com / testpass123 (Test User) - Group member/admin
+- second@example.com / testpass123 (Second User) - Group owner/admin
 
 ## Server
 - Development server: http://localhost:3001 (port 3000 in use)
@@ -108,14 +94,22 @@
 
 ## Database
 - SQLite: prisma/dev.db
+- UserPrivacyPreference table stores privacy settings
 
 ## What To Work On Next
-- Feature #87 and beyond
+- Feature #124 and beyond
 - Continue with remaining functional features
-- Current progress: 83/155 (53.5%)
-- Over halfway complete!
+- Current progress: 136/156 (87.2%)
+- Nearing completion!
 
 ## Architecture Notes
-- Using in-memory cache (can be upgraded to Redis for production)
-- Cache keys use patterns like "game:search:{query}" and "game:detail:{id}"
-- Group dashboard aggregates data from all member entries
+- Privacy preferences stored in UserPrivacyPreference table
+- Dashboard API fetches privacy settings for all group members
+- Privacy filtering applied server-side (secure - can't bypass via client)
+- Default privacy settings used if user hasn't set preferences:
+  - showActivityToGroup: true
+  - showGameStatus: true
+  - showRatings: true
+  - showNotes: false (private by default)
+  - showOnlineStatus: true
+  - allowGroupInvites: true
