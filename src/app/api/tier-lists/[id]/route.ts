@@ -25,6 +25,9 @@ export async function GET(
       userId: string | null
       groupId: string | null
       isPublic: number
+      categories: string
+      platforms: string
+      gameModes: string
       createdAt: string
       updatedAt: string
     }>>`
@@ -114,6 +117,9 @@ export async function GET(
       tierList: {
         ...tierList,
         isPublic: tierList.isPublic === 1,
+        categories: JSON.parse(tierList.categories || "[]"),
+        platforms: JSON.parse(tierList.platforms || "[]"),
+        gameModes: JSON.parse(tierList.gameModes || "[]"),
         isOwner,
       },
       tiers,
@@ -172,7 +178,7 @@ export async function PATCH(
     }
 
     const body = await request.json()
-    const { name, description, isPublic } = body
+    const { name, description, isPublic, categories, platforms, gameModes } = body
 
     // Build update query
     const updates: string[] = []
@@ -187,12 +193,20 @@ export async function PATCH(
       }
     }
 
+    // Sanitize category arrays
+    const categoriesJson = categories !== undefined ? JSON.stringify(Array.isArray(categories) ? categories : []) : null
+    const platformsJson = platforms !== undefined ? JSON.stringify(Array.isArray(platforms) ? platforms : []) : null
+    const gameModesJson = gameModes !== undefined ? JSON.stringify(Array.isArray(gameModes) ? gameModes : []) : null
+
     await prisma.$executeRaw`
       UPDATE TierList
       SET
         name = COALESCE(${name !== undefined ? name.trim() : null}, name),
         description = CASE WHEN ${description !== undefined ? 1 : 0} = 1 THEN ${description || null} ELSE description END,
         isPublic = CASE WHEN ${isPublic !== undefined ? 1 : 0} = 1 THEN ${isPublic ? 1 : 0} ELSE isPublic END,
+        categories = CASE WHEN ${categoriesJson !== null ? 1 : 0} = 1 THEN ${categoriesJson} ELSE categories END,
+        platforms = CASE WHEN ${platformsJson !== null ? 1 : 0} = 1 THEN ${platformsJson} ELSE platforms END,
+        gameModes = CASE WHEN ${gameModesJson !== null ? 1 : 0} = 1 THEN ${gameModesJson} ELSE gameModes END,
         updatedAt = datetime('now')
       WHERE id = ${tierListId}
     `
@@ -202,15 +216,21 @@ export async function PATCH(
       name: string
       description: string | null
       isPublic: number
+      categories: string
+      platforms: string
+      gameModes: string
       updatedAt: string
     }>>`
-      SELECT id, name, description, isPublic, updatedAt FROM TierList WHERE id = ${tierListId}
+      SELECT id, name, description, isPublic, categories, platforms, gameModes, updatedAt FROM TierList WHERE id = ${tierListId}
     `
 
     return NextResponse.json({
       tierList: {
         ...updated[0],
         isPublic: updated[0].isPublic === 1,
+        categories: JSON.parse(updated[0].categories || "[]"),
+        platforms: JSON.parse(updated[0].platforms || "[]"),
+        gameModes: JSON.parse(updated[0].gameModes || "[]"),
       }
     })
   } catch (error) {

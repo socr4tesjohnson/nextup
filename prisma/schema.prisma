@@ -312,6 +312,9 @@ model TierList {
   userId      String?  // User who created this tier list (null for group tier lists)
   groupId     String?  // Group this tier list belongs to (null for personal tier lists)
   isPublic    Boolean  @default(false)  // Whether this tier list is visible to others
+  categories  String   @default("[]")   // JSON array of genre/category filters (e.g., ["RPG", "Action"])
+  platforms   String   @default("[]")   // JSON array of platform filters (e.g., ["PC", "PlayStation"])
+  gameModes   String   @default("[]")   // JSON array of player mode filters (e.g., ["Co-op", "Multiplayer"])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

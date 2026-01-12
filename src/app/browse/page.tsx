@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useSession } from "next-auth/react"
-import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
+import Link from "next/link"
 import { Header } from "@/components/layout/header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,13 +13,13 @@ import { Skeleton } from "@/components/ui/skeleton"
 
 interface Game {
   id: string
-  igdbId: number
+  providerGameId: string
   name: string
   coverUrl: string | null
   firstReleaseDate: string | null
   genres: string[]
   platforms: string[]
-  gameModes?: string[]
+  gameModes: string[]
   summary: string | null
 }
 
@@ -32,11 +32,18 @@ const STATUS_OPTIONS = [
   { value: "FAVORITE", label: "Favorite" },
 ]
 
-export default function SearchPage() {
+function BrowseContent() {
   const { data: session } = useSession()
   const searchParams = useSearchParams()
   const router = useRouter()
-  const [query, setQuery] = useState("")
+
+  // Get filter parameters from URL
+  const initialGenres = searchParams.get("genres")?.split(",").filter(Boolean) || []
+  const initialPlatforms = searchParams.get("platforms")?.split(",").filter(Boolean) || []
+  const initialGameModes = searchParams.get("gameModes")?.split(",").filter(Boolean) || []
+  const initialQuery = searchParams.get("q") || ""
+
+  const [query, setQuery] = useState(initialQuery)
   const [searching, setSearching] = useState(false)
   const [results, setResults] = useState<Game[]>([])
   const [selectedGame, setSelectedGame] = useState<Game | null>(null)
@@ -48,72 +55,31 @@ export default function SearchPage() {
   const [platform, setPlatform] = useState("")
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
-  // Filter state
-  const [activeGenres, setActiveGenres] = useState<string[]>([])
-  const [activePlatforms, setActivePlatforms] = useState<string[]>([])
-  const [activeGameModes, setActiveGameModes] = useState<string[]>([])
 
-  // Add a filter (AND logic - add to existing filters)
-  const addFilter = (type: 'genres' | 'platforms' | 'gameModes', value: string) => {
-    let newGenres = activeGenres
-    let newPlatforms = activePlatforms
-    let newGameModes = activeGameModes
+  // Active filters state
+  const [activeGenres, setActiveGenres] = useState<string[]>(initialGenres)
+  const [activePlatforms, setActivePlatforms] = useState<string[]>(initialPlatforms)
+  const [activeGameModes, setActiveGameModes] = useState<string[]>(initialGameModes)
 
-    if (type === 'genres' && !activeGenres.includes(value)) {
-      newGenres = [...activeGenres, value]
-      setActiveGenres(newGenres)
-    } else if (type === 'platforms' && !activePlatforms.includes(value)) {
-      newPlatforms = [...activePlatforms, value]
-      setActivePlatforms(newPlatforms)
-    } else if (type === 'gameModes' && !activeGameModes.includes(value)) {
-      newGameModes = [...activeGameModes, value]
-      setActiveGameModes(newGameModes)
+  const hasActiveFilters = activeGenres.length > 0 || activePlatforms.length > 0 || activeGameModes.length > 0
+
+  // Sync state with URL params on mount
+  useEffect(() => {
+    const genres = searchParams.get("genres")?.split(",").filter(Boolean) || []
+    const platforms = searchParams.get("platforms")?.split(",").filter(Boolean) || []
+    const gameModes = searchParams.get("gameModes")?.split(",").filter(Boolean) || []
+    const q = searchParams.get("q") || ""
+
+    setActiveGenres(genres)
+    setActivePlatforms(platforms)
+    setActiveGameModes(gameModes)
+    setQuery(q)
+
+    // Auto-search if there are filters or query
+    if (genres.length > 0 || platforms.length > 0 || gameModes.length > 0 || q) {
+      performSearch(q, genres, platforms, gameModes)
     }
-
-    // Update URL and perform search
-    const params = new URLSearchParams()
-    if (query) params.set('q', query)
-    if (newGenres.length > 0) params.set('genres', newGenres.join(','))
-    if (newPlatforms.length > 0) params.set('platforms', newPlatforms.join(','))
-    if (newGameModes.length > 0) params.set('gameModes', newGameModes.join(','))
-
-    router.push(`/search?${params.toString()}`)
-  }
-
-  // Remove a filter
-  const removeFilter = (type: 'genres' | 'platforms' | 'gameModes', value: string) => {
-    let newGenres = activeGenres
-    let newPlatforms = activePlatforms
-    let newGameModes = activeGameModes
-
-    if (type === 'genres') {
-      newGenres = activeGenres.filter(g => g !== value)
-      setActiveGenres(newGenres)
-    } else if (type === 'platforms') {
-      newPlatforms = activePlatforms.filter(p => p !== value)
-      setActivePlatforms(newPlatforms)
-    } else if (type === 'gameModes') {
-      newGameModes = activeGameModes.filter(m => m !== value)
-      setActiveGameModes(newGameModes)
-    }
-
-    // Update URL and perform search
-    const params = new URLSearchParams()
-    if (query) params.set('q', query)
-    if (newGenres.length > 0) params.set('genres', newGenres.join(','))
-    if (newPlatforms.length > 0) params.set('platforms', newPlatforms.join(','))
-    if (newGameModes.length > 0) params.set('gameModes', newGameModes.join(','))
-
-    const paramStr = params.toString()
-    router.push(paramStr ? `/search?${paramStr}` : '/search')
-
-    // If no filters remain, clear results
-    if (newGenres.length === 0 && newPlatforms.length === 0 && newGameModes.length === 0 && !query) {
-      setResults([])
-    } else {
-      performFilterSearch(query, newGenres, newPlatforms, newGameModes)
-    }
-  }
+  }, [searchParams])
 
   // Handle Escape key to close modal
   useEffect(() => {
@@ -128,40 +94,25 @@ export default function SearchPage() {
     return () => document.removeEventListener("keydown", handleEscape)
   }, [showAddModal])
 
-  // Read filter parameters from URL and auto-search
-  useEffect(() => {
-    const genresParam = searchParams.get("genres")
-    const platformsParam = searchParams.get("platforms")
-    const gameModesParam = searchParams.get("gameModes")
-    const qParam = searchParams.get("q")
-
-    const newGenres = genresParam ? genresParam.split(",").filter(Boolean) : []
-    const newPlatforms = platformsParam ? platformsParam.split(",").filter(Boolean) : []
-    const newGameModes = gameModesParam ? gameModesParam.split(",").filter(Boolean) : []
-
-    setActiveGenres(newGenres)
-    setActivePlatforms(newPlatforms)
-    setActiveGameModes(newGameModes)
-
-    if (qParam) {
-      setQuery(qParam)
-    }
-
-    // Auto-search if there are filters
-    if (newGenres.length > 0 || newPlatforms.length > 0 || newGameModes.length > 0) {
-      performFilterSearch(qParam || "", newGenres, newPlatforms, newGameModes)
-    }
-  }, [searchParams])
-
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!query.trim()) return
-
+  const performSearch = async (
+    searchQuery: string,
+    genres: string[],
+    platforms: string[],
+    gameModes: string[]
+  ) => {
     setSearching(true)
     setError("")
+
     try {
-      const response = await fetch(`/api/games/search?q=${encodeURIComponent(query)}`)
+      const params = new URLSearchParams()
+      if (searchQuery) params.set("q", searchQuery)
+      if (genres.length > 0) params.set("genres", genres.join(","))
+      if (platforms.length > 0) params.set("platforms", platforms.join(","))
+      if (gameModes.length > 0) params.set("gameModes", gameModes.join(","))
+
+      const response = await fetch(`/api/games/filter?${params.toString()}`)
       const data = await response.json()
+
       if (response.ok) {
         setResults(data.games || [])
       } else {
@@ -175,28 +126,82 @@ export default function SearchPage() {
     }
   }
 
-  const performFilterSearch = async (q: string, genres: string[], platforms: string[], gameModes: string[]) => {
-    setSearching(true)
-    setError("")
-    try {
-      const params = new URLSearchParams()
-      if (q) params.set("q", q)
-      if (genres.length > 0) params.set("genres", genres.join(","))
-      if (platforms.length > 0) params.set("platforms", platforms.join(","))
-      if (gameModes.length > 0) params.set("gameModes", gameModes.join(","))
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!query.trim() && !hasActiveFilters) return
 
-      const response = await fetch(`/api/games/filter?${params.toString()}`)
-      const data = await response.json()
-      if (response.ok) {
-        setResults(data.games || [])
-      } else {
-        setError(data.error || "Search failed")
-      }
-    } catch (err) {
-      setError("Search failed. Please try again.")
-    } finally {
-      setSearching(false)
+    // Update URL with search params
+    const params = new URLSearchParams()
+    if (query) params.set("q", query)
+    if (activeGenres.length > 0) params.set("genres", activeGenres.join(","))
+    if (activePlatforms.length > 0) params.set("platforms", activePlatforms.join(","))
+    if (activeGameModes.length > 0) params.set("gameModes", activeGameModes.join(","))
+
+    router.push(`/browse?${params.toString()}`)
+    performSearch(query, activeGenres, activePlatforms, activeGameModes)
+  }
+
+  const removeFilter = (type: "genres" | "platforms" | "gameModes", value: string) => {
+    let newGenres = [...activeGenres]
+    let newPlatforms = [...activePlatforms]
+    let newGameModes = [...activeGameModes]
+
+    if (type === "genres") {
+      newGenres = activeGenres.filter(g => g !== value)
+      setActiveGenres(newGenres)
+    } else if (type === "platforms") {
+      newPlatforms = activePlatforms.filter(p => p !== value)
+      setActivePlatforms(newPlatforms)
+    } else if (type === "gameModes") {
+      newGameModes = activeGameModes.filter(m => m !== value)
+      setActiveGameModes(newGameModes)
     }
+
+    // Update URL
+    const params = new URLSearchParams()
+    if (query) params.set("q", query)
+    if (newGenres.length > 0) params.set("genres", newGenres.join(","))
+    if (newPlatforms.length > 0) params.set("platforms", newPlatforms.join(","))
+    if (newGameModes.length > 0) params.set("gameModes", newGameModes.join(","))
+
+    router.push(`/browse?${params.toString()}`)
+    performSearch(query, newGenres, newPlatforms, newGameModes)
+  }
+
+  const clearAllFilters = () => {
+    setActiveGenres([])
+    setActivePlatforms([])
+    setActiveGameModes([])
+    setQuery("")
+    setResults([])
+    router.push("/browse")
+  }
+
+  const addFilter = (type: "genres" | "platforms" | "gameModes", value: string) => {
+    let newGenres = [...activeGenres]
+    let newPlatforms = [...activePlatforms]
+    let newGameModes = [...activeGameModes]
+
+    if (type === "genres" && !activeGenres.includes(value)) {
+      newGenres = [...activeGenres, value]
+      setActiveGenres(newGenres)
+    } else if (type === "platforms" && !activePlatforms.includes(value)) {
+      newPlatforms = [...activePlatforms, value]
+      setActivePlatforms(newPlatforms)
+    } else if (type === "gameModes" && !activeGameModes.includes(value)) {
+      newGameModes = [...activeGameModes, value]
+      setActiveGameModes(newGameModes)
+    }
+
+    // Update URL and search
+    const params = new URLSearchParams()
+    if (query) params.set("q", query)
+    if (newGenres.length > 0) params.set("genres", newGenres.join(","))
+    if (newPlatforms.length > 0) params.set("platforms", newPlatforms.join(","))
+    if (newGameModes.length > 0) params.set("gameModes", newGameModes.join(","))
+
+    router.push(`/browse?${params.toString()}`)
+    performSearch(query, newGenres, newPlatforms, newGameModes)
   }
 
   const openAddModal = (game: Game) => {
@@ -254,9 +259,9 @@ export default function SearchPage() {
 
       <main id="main-content" className="container mx-auto px-4 py-8">
         <div className="max-w-2xl mx-auto mb-8">
-          <h1 className="text-3xl font-bold mb-2">Search Games</h1>
+          <h1 className="text-3xl font-bold mb-2">Browse Games</h1>
           <p className="text-muted-foreground mb-6">
-            Find games to add to your lists and share with your groups.
+            Search and filter games by genre, platform, and game mode.
           </p>
 
           <form onSubmit={handleSearch} className="flex gap-2">
@@ -268,70 +273,52 @@ export default function SearchPage() {
               className="flex-1"
               disabled={searching}
             />
-            <Button type="submit" disabled={searching || !query.trim()}>
+            <Button type="submit" disabled={searching || (!query.trim() && !hasActiveFilters)}>
               {searching ? "Searching..." : "Search"}
             </Button>
           </form>
 
           {/* Active Filters Display */}
-          {(activeGenres.length > 0 || activePlatforms.length > 0 || activeGameModes.length > 0) && (
+          {hasActiveFilters && (
             <div className="mt-4 p-4 rounded-lg bg-muted/50 border">
               <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-medium">Active Filters (AND search)</h3>
-                <button
-                  onClick={() => {
-                    router.push('/search')
-                    setActiveGenres([])
-                    setActivePlatforms([])
-                    setActiveGameModes([])
-                    setResults([])
-                  }}
-                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Clear all
-                </button>
+                <h3 className="text-sm font-semibold">Active Filters (AND)</h3>
+                <Button variant="ghost" size="sm" onClick={clearAllFilters}>
+                  Clear All
+                </Button>
               </div>
               <div className="flex flex-wrap gap-2">
-                {activeGenres.map((genre) => (
+                {activeGenres.map(genre => (
                   <button
                     key={`genre-${genre}`}
-                    onClick={() => removeFilter('genres', genre)}
-                    className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-primary/20 text-primary hover:bg-primary/30 transition-colors"
+                    onClick={() => removeFilter("genres", genre)}
+                    className="inline-flex items-center gap-1 px-3 py-1 bg-primary/10 text-primary rounded-full text-sm hover:bg-primary/20 transition-colors"
                   >
-                    <span className="text-primary/60">Genre:</span> {genre}
-                    <span className="ml-1 text-primary/60 hover:text-primary">×</span>
+                    <span>Genre: {genre}</span>
+                    <span className="font-bold">×</span>
                   </button>
                 ))}
-                {activePlatforms.map((platform) => (
+                {activePlatforms.map(platform => (
                   <button
                     key={`platform-${platform}`}
-                    onClick={() => removeFilter('platforms', platform)}
-                    className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-muted text-foreground hover:bg-muted/80 transition-colors"
+                    onClick={() => removeFilter("platforms", platform)}
+                    className="inline-flex items-center gap-1 px-3 py-1 bg-muted text-muted-foreground rounded-full text-sm hover:bg-muted/80 transition-colors"
                   >
-                    <span className="text-muted-foreground">Platform:</span> {platform}
-                    <span className="ml-1 text-muted-foreground hover:text-foreground">×</span>
+                    <span>Platform: {platform}</span>
+                    <span className="font-bold">×</span>
                   </button>
                 ))}
-                {activeGameModes.map((mode) => (
+                {activeGameModes.map(mode => (
                   <button
                     key={`mode-${mode}`}
-                    onClick={() => removeFilter('gameModes', mode)}
-                    className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-colors ${
-                      mode.toLowerCase().includes("single")
-                        ? "bg-blue-500/20 text-blue-600 dark:text-blue-400 hover:bg-blue-500/30"
-                        : mode.toLowerCase().includes("co-op") || mode.toLowerCase().includes("coop")
-                        ? "bg-green-500/20 text-green-600 dark:text-green-400 hover:bg-green-500/30"
-                        : "bg-purple-500/20 text-purple-600 dark:text-purple-400 hover:bg-purple-500/30"
-                    }`}
+                    onClick={() => removeFilter("gameModes", mode)}
+                    className="inline-flex items-center gap-1 px-3 py-1 bg-blue-500/20 text-blue-600 dark:text-blue-400 rounded-full text-sm hover:bg-blue-500/30 transition-colors"
                   >
-                    <span className="opacity-60">Mode:</span> {mode}
-                    <span className="ml-1 opacity-60 hover:opacity-100">×</span>
+                    <span>Mode: {mode}</span>
+                    <span className="font-bold">×</span>
                   </button>
                 ))}
               </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                Click on tags in search results to add more filters. Games must match ALL filters.
-              </p>
             </div>
           )}
         </div>
@@ -366,7 +353,7 @@ export default function SearchPage() {
         ) : results.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {results.map((game) => (
-              <Card key={game.id} className="overflow-hidden group hover:shadow-lg transition-all duration-200">
+              <Card key={game.id} className="overflow-hidden group hover:shadow-lg hover:scale-[1.02] transition-all duration-200">
                 <Link href={`/games/${game.id}`} className="block">
                   <div className="aspect-[3/4] relative bg-muted overflow-hidden">
                     {game.coverUrl ? (
@@ -390,8 +377,10 @@ export default function SearchPage() {
                     )}
                   </CardHeader>
                 </Link>
-                <CardContent className="space-y-2">
-                  {/* Clickable Genre Tags */}
+
+                {/* Clickable Badges */}
+                <CardContent className="pt-0 space-y-2">
+                  {/* Genres */}
                   {game.genres && game.genres.length > 0 && (
                     <div className="flex flex-wrap gap-1">
                       {game.genres.slice(0, 3).map((genre) => (
@@ -399,21 +388,18 @@ export default function SearchPage() {
                           key={genre}
                           onClick={(e) => {
                             e.stopPropagation()
-                            addFilter('genres', genre)
+                            addFilter("genres", genre)
                           }}
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium transition-all hover:scale-105 ${
-                            activeGenres.includes(genre)
-                              ? 'bg-primary text-primary-foreground'
-                              : 'bg-primary/10 text-primary hover:bg-primary/20'
-                          }`}
-                          title={activeGenres.includes(genre) ? `${genre} is active` : `Add ${genre} to filter`}
+                          className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors cursor-pointer"
+                          title={`Filter by ${genre}`}
                         >
                           {genre}
                         </button>
                       ))}
                     </div>
                   )}
-                  {/* Clickable Platform Tags */}
+
+                  {/* Platforms */}
                   {game.platforms && game.platforms.length > 0 && (
                     <div className="flex flex-wrap gap-1">
                       {game.platforms.slice(0, 3).map((plat) => (
@@ -421,14 +407,10 @@ export default function SearchPage() {
                           key={plat}
                           onClick={(e) => {
                             e.stopPropagation()
-                            addFilter('platforms', plat)
+                            addFilter("platforms", plat)
                           }}
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium transition-all hover:scale-105 ${
-                            activePlatforms.includes(plat)
-                              ? 'bg-muted-foreground text-background'
-                              : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground'
-                          }`}
-                          title={activePlatforms.includes(plat) ? `${plat} is active` : `Add ${plat} to filter`}
+                          className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground hover:bg-muted/80 transition-colors cursor-pointer"
+                          title={`Filter by ${plat}`}
                         >
                           {plat}
                         </button>
@@ -440,38 +422,34 @@ export default function SearchPage() {
                       )}
                     </div>
                   )}
-                  {/* Clickable Game Mode Tags */}
+
+                  {/* Game Modes */}
                   {game.gameModes && game.gameModes.length > 0 && (
                     <div className="flex flex-wrap gap-1">
-                      {game.gameModes.slice(0, 2).map((mode) => (
+                      {game.gameModes.map((mode) => (
                         <button
                           key={mode}
                           onClick={(e) => {
                             e.stopPropagation()
-                            addFilter('gameModes', mode)
+                            addFilter("gameModes", mode)
                           }}
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium transition-all hover:scale-105 ${
-                            activeGameModes.includes(mode)
-                              ? mode.toLowerCase().includes("single")
-                                ? 'bg-blue-600 text-white'
-                                : mode.toLowerCase().includes("co-op") || mode.toLowerCase().includes("coop")
-                                ? 'bg-green-600 text-white'
-                                : 'bg-purple-600 text-white'
-                              : mode.toLowerCase().includes("single")
-                              ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400 hover:bg-blue-500/30'
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium cursor-pointer transition-colors ${
+                            mode.toLowerCase().includes("single")
+                              ? "bg-blue-500/20 text-blue-600 dark:text-blue-400 hover:bg-blue-500/30"
                               : mode.toLowerCase().includes("co-op") || mode.toLowerCase().includes("coop")
-                              ? 'bg-green-500/20 text-green-600 dark:text-green-400 hover:bg-green-500/30'
-                              : 'bg-purple-500/20 text-purple-600 dark:text-purple-400 hover:bg-purple-500/30'
+                              ? "bg-green-500/20 text-green-600 dark:text-green-400 hover:bg-green-500/30"
+                              : "bg-purple-500/20 text-purple-600 dark:text-purple-400 hover:bg-purple-500/30"
                           }`}
-                          title={activeGameModes.includes(mode) ? `${mode} is active` : `Add ${mode} to filter`}
+                          title={`Filter by ${mode}`}
                         >
                           {mode}
                         </button>
                       ))}
                     </div>
                   )}
+
                   <Button
-                    className="w-full"
+                    className="w-full mt-2"
                     variant="outline"
                     onClick={() => openAddModal(game)}
                   >
@@ -481,17 +459,20 @@ export default function SearchPage() {
               </Card>
             ))}
           </div>
-        ) : query && !searching ? (
+        ) : (query || hasActiveFilters) && !searching ? (
           <Card className="max-w-2xl mx-auto">
             <CardContent className="py-8 text-center">
-              <p className="text-muted-foreground">No games found for "{query}"</p>
+              <p className="text-muted-foreground">
+                No games found matching your criteria.
+                {hasActiveFilters && " Try removing some filters."}
+              </p>
             </CardContent>
           </Card>
         ) : (
           <Card className="max-w-2xl mx-auto">
             <CardContent className="py-8 text-center">
               <p className="text-muted-foreground">
-                Start typing to search for games in our database.
+                Start typing to search for games, or click on badges to filter.
               </p>
             </CardContent>
           </Card>
@@ -607,5 +588,23 @@ export default function SearchPage() {
         )}
       </main>
     </div>
+  )
+}
+
+export default function BrowsePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container mx-auto px-4 py-8">
+          <div className="animate-pulse">
+            <div className="h-8 w-64 bg-muted rounded mb-4"></div>
+            <div className="h-4 w-96 bg-muted rounded"></div>
+          </div>
+        </main>
+      </div>
+    }>
+      <BrowseContent />
+    </Suspense>
   )
 }

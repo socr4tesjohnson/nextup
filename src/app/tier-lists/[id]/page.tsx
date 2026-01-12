@@ -29,6 +29,9 @@ interface TierList {
   groupId: string | null
   isPublic: boolean
   isOwner: boolean
+  categories: string[]
+  platforms: string[]
+  gameModes: string[]
   createdAt: string
   updatedAt: string
 }
@@ -83,6 +86,9 @@ export default function TierListPage() {
   const [editName, setEditName] = useState("")
   const [editDescription, setEditDescription] = useState("")
   const [editPublic, setEditPublic] = useState(false)
+  const [editCategories, setEditCategories] = useState("")
+  const [editPlatforms, setEditPlatforms] = useState("")
+  const [editGameModes, setEditGameModes] = useState("")
 
   // Add game modal
   const [showAddGame, setShowAddGame] = useState(false)
@@ -124,6 +130,9 @@ export default function TierListPage() {
       setEditName(data.tierList.name)
       setEditDescription(data.tierList.description || "")
       setEditPublic(data.tierList.isPublic)
+      setEditCategories((data.tierList.categories || []).join(", "))
+      setEditPlatforms((data.tierList.platforms || []).join(", "))
+      setEditGameModes((data.tierList.gameModes || []).join(", "))
     } catch (err) {
       console.error("Error fetching tier list:", err)
       setError("Failed to load tier list")
@@ -229,6 +238,11 @@ export default function TierListPage() {
 
     try {
       setSaving(true)
+      // Parse comma-separated values into arrays
+      const categories = editCategories.split(",").map(s => s.trim()).filter(Boolean)
+      const platforms = editPlatforms.split(",").map(s => s.trim()).filter(Boolean)
+      const gameModes = editGameModes.split(",").map(s => s.trim()).filter(Boolean)
+
       const response = await fetch(`/api/tier-lists/${tierListId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -236,6 +250,9 @@ export default function TierListPage() {
           name: editName.trim(),
           description: editDescription.trim() || null,
           isPublic: editPublic,
+          categories,
+          platforms,
+          gameModes,
         }),
       })
 
@@ -246,6 +263,9 @@ export default function TierListPage() {
           name: data.tierList.name,
           description: data.tierList.description,
           isPublic: data.tierList.isPublic,
+          categories: data.tierList.categories || [],
+          platforms: data.tierList.platforms || [],
+          gameModes: data.tierList.gameModes || [],
         })
         setShowSettings(false)
         setSuccessMessage("Settings saved!")
@@ -390,7 +410,7 @@ export default function TierListPage() {
             {tierList.description && (
               <p className="text-muted-foreground mt-1">{tierList.description}</p>
             )}
-            <div className="flex items-center gap-2 mt-2">
+            <div className="flex items-center gap-2 mt-2 flex-wrap">
               <span
                 className={`text-xs px-2 py-1 rounded ${
                   tierList.isPublic
@@ -404,6 +424,44 @@ export default function TierListPage() {
                 <span className="text-xs text-muted-foreground">View only</span>
               )}
             </div>
+            {/* Display categories */}
+            {(tierList.categories?.length > 0 || tierList.platforms?.length > 0 || tierList.gameModes?.length > 0) && (
+              <div className="flex flex-wrap gap-1 mt-3">
+                {tierList.categories?.map((cat) => (
+                  <Link
+                    key={cat}
+                    href={`/search?genres=${encodeURIComponent(cat)}`}
+                    className="px-2 py-0.5 text-xs rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                  >
+                    {cat}
+                  </Link>
+                ))}
+                {tierList.platforms?.map((plat) => (
+                  <Link
+                    key={plat}
+                    href={`/search?platforms=${encodeURIComponent(plat)}`}
+                    className="px-2 py-0.5 text-xs rounded-full bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {plat}
+                  </Link>
+                ))}
+                {tierList.gameModes?.map((mode) => (
+                  <Link
+                    key={mode}
+                    href={`/search?gameModes=${encodeURIComponent(mode)}`}
+                    className={`px-2 py-0.5 text-xs rounded-full transition-colors ${
+                      mode.toLowerCase().includes("co-op") || mode.toLowerCase().includes("coop")
+                        ? "bg-green-500/20 text-green-600 hover:bg-green-500/30"
+                        : mode.toLowerCase().includes("multiplayer")
+                        ? "bg-purple-500/20 text-purple-600 hover:bg-purple-500/30"
+                        : "bg-blue-500/20 text-blue-600 hover:bg-blue-500/30"
+                    }`}
+                  >
+                    {mode}
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
           {tierList.isOwner && (
             <div className="flex gap-2">
@@ -531,7 +589,7 @@ export default function TierListPage() {
             className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
             onClick={() => setShowSettings(false)}
           >
-            <Card className="w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
+            <Card className="w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
               <CardHeader>
                 <CardTitle>Tier List Settings</CardTitle>
               </CardHeader>
@@ -554,6 +612,37 @@ export default function TierListPage() {
                       value={editDescription}
                       onChange={(e) => setEditDescription(e.target.value)}
                       className="w-full p-2 border rounded-md bg-background min-h-[80px]"
+                      disabled={saving}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="settings-categories">Categories/Genres (comma-separated)</Label>
+                    <Input
+                      id="settings-categories"
+                      value={editCategories}
+                      onChange={(e) => setEditCategories(e.target.value)}
+                      placeholder="RPG, Action, Adventure"
+                      disabled={saving}
+                    />
+                    <p className="text-xs text-muted-foreground">e.g., RPG, Action, Horror, Indie</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="settings-platforms">Platforms (comma-separated)</Label>
+                    <Input
+                      id="settings-platforms"
+                      value={editPlatforms}
+                      onChange={(e) => setEditPlatforms(e.target.value)}
+                      placeholder="PC, PlayStation, Nintendo Switch"
+                      disabled={saving}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="settings-gamemodes">Player Modes (comma-separated)</Label>
+                    <Input
+                      id="settings-gamemodes"
+                      value={editGameModes}
+                      onChange={(e) => setEditGameModes(e.target.value)}
+                      placeholder="Single player, Co-op, Multiplayer"
                       disabled={saving}
                     />
                   </div>

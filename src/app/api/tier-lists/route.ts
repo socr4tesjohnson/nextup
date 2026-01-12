@@ -25,6 +25,10 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const type = searchParams.get("type") || "my" // "my", "public", "similar"
     const groupId = searchParams.get("groupId")
+    // Filter parameters for searching tier lists
+    const categoryFilter = searchParams.get("categories")?.split(",").filter(Boolean) || []
+    const platformFilter = searchParams.get("platforms")?.split(",").filter(Boolean) || []
+    const gameModeFilter = searchParams.get("gameModes")?.split(",").filter(Boolean) || []
 
     if (type === "my") {
       // Get user's own tier lists
@@ -35,10 +39,13 @@ export async function GET(request: NextRequest) {
         userId: string | null
         groupId: string | null
         isPublic: number
+        categories: string
+        platforms: string
+        gameModes: string
         createdAt: string
         updatedAt: string
       }>>`
-        SELECT id, name, description, userId, groupId, isPublic, createdAt, updatedAt
+        SELECT id, name, description, userId, groupId, isPublic, categories, platforms, gameModes, createdAt, updatedAt
         FROM TierList
         WHERE userId = ${session.user.id}
         ORDER BY updatedAt DESC
@@ -70,6 +77,9 @@ export async function GET(request: NextRequest) {
           return {
             ...list,
             isPublic: list.isPublic === 1,
+            categories: JSON.parse(list.categories || "[]"),
+            platforms: JSON.parse(list.platforms || "[]"),
+            gameModes: JSON.parse(list.gameModes || "[]"),
             gameCount: games.length,
           }
         })
@@ -87,11 +97,15 @@ export async function GET(request: NextRequest) {
         userId: string | null
         groupId: string | null
         isPublic: number
+        categories: string
+        platforms: string
+        gameModes: string
         createdAt: string
         updatedAt: string
         userName: string | null
       }>>`
         SELECT tl.id, tl.name, tl.description, tl.userId, tl.groupId, tl.isPublic,
+               tl.categories, tl.platforms, tl.gameModes,
                tl.createdAt, tl.updatedAt, u.name as userName
         FROM TierList tl
         LEFT JOIN User u ON tl.userId = u.id
@@ -100,14 +114,40 @@ export async function GET(request: NextRequest) {
         LIMIT 50
       `
 
+      // Filter tier lists by categories if filters provided
+      let filteredLists = tierLists
+      if (categoryFilter.length > 0 || platformFilter.length > 0 || gameModeFilter.length > 0) {
+        filteredLists = tierLists.filter(list => {
+          const listCategories = JSON.parse(list.categories || "[]").map((c: string) => c.toLowerCase())
+          const listPlatforms = JSON.parse(list.platforms || "[]").map((p: string) => p.toLowerCase())
+          const listGameModes = JSON.parse(list.gameModes || "[]").map((m: string) => m.toLowerCase())
+
+          // All filters must match (AND logic)
+          const categoryMatch = categoryFilter.length === 0 || categoryFilter.every(c =>
+            listCategories.some((lc: string) => lc.includes(c.toLowerCase()))
+          )
+          const platformMatch = platformFilter.length === 0 || platformFilter.every(p =>
+            listPlatforms.some((lp: string) => lp.includes(p.toLowerCase()))
+          )
+          const gameModeMatch = gameModeFilter.length === 0 || gameModeFilter.every(m =>
+            listGameModes.some((lm: string) => lm.includes(m.toLowerCase()))
+          )
+
+          return categoryMatch && platformMatch && gameModeMatch
+        })
+      }
+
       const tierListsWithGames = await Promise.all(
-        tierLists.map(async (list) => {
+        filteredLists.map(async (list) => {
           const gameCount = await prisma.$queryRaw<Array<{ count: number }>>`
             SELECT COUNT(*) as count FROM TierListGame WHERE tierListId = ${list.id}
           `
           return {
             ...list,
             isPublic: true,
+            categories: JSON.parse(list.categories || "[]"),
+            platforms: JSON.parse(list.platforms || "[]"),
+            gameModes: JSON.parse(list.gameModes || "[]"),
             gameCount: gameCount[0]?.count || 0,
           }
         })
@@ -142,7 +182,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, description, isPublic, groupId } = body
+    const { name, description, isPublic, groupId, categories, platforms, gameModes } = body
 
     if (!name || typeof name !== "string" || name.trim().length === 0) {
       return NextResponse.json({ error: "Name is required" }, { status: 400 })
@@ -162,12 +202,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Sanitize category arrays
+    const categoriesJson = JSON.stringify(Array.isArray(categories) ? categories : [])
+    const platformsJson = JSON.stringify(Array.isArray(platforms) ? platforms : [])
+    const gameModesJson = JSON.stringify(Array.isArray(gameModes) ? gameModes : [])
+
     // Generate a unique ID
     const id = `tl_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
 
     await prisma.$executeRaw`
-      INSERT INTO TierList (id, name, description, userId, groupId, isPublic, createdAt, updatedAt)
-      VALUES (${id}, ${name.trim()}, ${description || null}, ${groupId ? null : session.user.id}, ${groupId || null}, ${isPublic ? 1 : 0}, datetime('now'), datetime('now'))
+      INSERT INTO TierList (id, name, description, userId, groupId, isPublic, categories, platforms, gameModes, createdAt, updatedAt)
+      VALUES (${id}, ${name.trim()}, ${description || null}, ${groupId ? null : session.user.id}, ${groupId || null}, ${isPublic ? 1 : 0}, ${categoriesJson}, ${platformsJson}, ${gameModesJson}, datetime('now'), datetime('now'))
     `
 
     const tierList = await prisma.$queryRaw<Array<{
@@ -177,6 +222,9 @@ export async function POST(request: NextRequest) {
       userId: string | null
       groupId: string | null
       isPublic: number
+      categories: string
+      platforms: string
+      gameModes: string
       createdAt: string
       updatedAt: string
     }>>`
@@ -187,6 +235,9 @@ export async function POST(request: NextRequest) {
       tierList: {
         ...tierList[0],
         isPublic: tierList[0].isPublic === 1,
+        categories: JSON.parse(tierList[0].categories || "[]"),
+        platforms: JSON.parse(tierList[0].platforms || "[]"),
+        gameModes: JSON.parse(tierList[0].gameModes || "[]"),
         gameCount: 0,
       }
     }, { status: 201 })

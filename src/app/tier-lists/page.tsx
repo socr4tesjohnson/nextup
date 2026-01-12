@@ -17,6 +17,9 @@ interface TierList {
   userId: string | null
   groupId: string | null
   isPublic: boolean
+  categories: string[]
+  platforms: string[]
+  gameModes: string[]
   createdAt: string
   updatedAt: string
   gameCount: number
@@ -49,7 +52,16 @@ export default function TierListsPage() {
   const [newListName, setNewListName] = useState("")
   const [newListDescription, setNewListDescription] = useState("")
   const [newListPublic, setNewListPublic] = useState(false)
+  const [newListCategories, setNewListCategories] = useState("")
+  const [newListPlatforms, setNewListPlatforms] = useState("")
+  const [newListGameModes, setNewListGameModes] = useState("")
   const [creating, setCreating] = useState(false)
+
+  // Search/filter state for public tier lists
+  const [filterCategories, setFilterCategories] = useState<string[]>([])
+  const [filterPlatforms, setFilterPlatforms] = useState<string[]>([])
+  const [filterGameModes, setFilterGameModes] = useState<string[]>([])
+  const [searchInput, setSearchInput] = useState("")
 
   useEffect(() => {
     if (sessionStatus === "loading") return
@@ -100,6 +112,11 @@ export default function TierListsPage() {
 
     setCreating(true)
     try {
+      // Parse comma-separated values into arrays
+      const categories = newListCategories.split(",").map(s => s.trim()).filter(Boolean)
+      const platforms = newListPlatforms.split(",").map(s => s.trim()).filter(Boolean)
+      const gameModes = newListGameModes.split(",").map(s => s.trim()).filter(Boolean)
+
       const response = await fetch("/api/tier-lists", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -107,6 +124,9 @@ export default function TierListsPage() {
           name: newListName.trim(),
           description: newListDescription.trim() || null,
           isPublic: newListPublic,
+          categories,
+          platforms,
+          gameModes,
         }),
       })
 
@@ -117,6 +137,9 @@ export default function TierListsPage() {
         setNewListName("")
         setNewListDescription("")
         setNewListPublic(false)
+        setNewListCategories("")
+        setNewListPlatforms("")
+        setNewListGameModes("")
         // Navigate to the new tier list
         router.push(`/tier-lists/${data.tierList.id}`)
       } else {
@@ -284,6 +307,32 @@ export default function TierListsPage() {
                           {tierList.description}
                         </CardDescription>
                       )}
+                      {/* Display categories/tags */}
+                      {(tierList.categories?.length > 0 || tierList.platforms?.length > 0 || tierList.gameModes?.length > 0) && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {tierList.categories?.map((cat) => (
+                            <span key={cat} className="px-2 py-0.5 text-xs rounded-full bg-primary/10 text-primary">
+                              {cat}
+                            </span>
+                          ))}
+                          {tierList.platforms?.map((plat) => (
+                            <span key={plat} className="px-2 py-0.5 text-xs rounded-full bg-muted text-muted-foreground">
+                              {plat}
+                            </span>
+                          ))}
+                          {tierList.gameModes?.map((mode) => (
+                            <span key={mode} className={`px-2 py-0.5 text-xs rounded-full ${
+                              mode.toLowerCase().includes("co-op") || mode.toLowerCase().includes("coop")
+                                ? "bg-green-500/20 text-green-600"
+                                : mode.toLowerCase().includes("multiplayer")
+                                ? "bg-purple-500/20 text-purple-600"
+                                : "bg-blue-500/20 text-blue-600"
+                            }`}>
+                              {mode}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </CardHeader>
                     <CardContent>
                       <div className="flex items-center justify-between text-sm text-muted-foreground">
@@ -315,6 +364,94 @@ export default function TierListsPage() {
         {/* Public Tier Lists Tab */}
         {activeTab === "public" && (
           <>
+            {/* Search/Filter Section for Public Lists */}
+            <div className="mb-6 p-4 bg-muted/30 rounded-lg border">
+              <h3 className="font-medium mb-3">Filter Tier Lists</h3>
+              <div className="flex flex-wrap gap-4">
+                <div className="flex-1 min-w-[200px]">
+                  <Label htmlFor="filter-input" className="text-xs text-muted-foreground">Search by tag</Label>
+                  <div className="flex gap-2 mt-1">
+                    <Input
+                      id="filter-input"
+                      value={searchInput}
+                      onChange={(e) => setSearchInput(e.target.value)}
+                      placeholder="RPG, Co-op, PC..."
+                      className="flex-1"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && searchInput.trim()) {
+                          e.preventDefault()
+                          // Add to filter categories
+                          const value = searchInput.trim()
+                          if (!filterCategories.includes(value)) {
+                            setFilterCategories([...filterCategories, value])
+                          }
+                          setSearchInput("")
+                        }
+                      }}
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (searchInput.trim()) {
+                          const value = searchInput.trim()
+                          if (!filterCategories.includes(value)) {
+                            setFilterCategories([...filterCategories, value])
+                          }
+                          setSearchInput("")
+                        }
+                      }}
+                    >
+                      Add Filter
+                    </Button>
+                  </div>
+                </div>
+              </div>
+              {/* Active Filters */}
+              {(filterCategories.length > 0 || filterPlatforms.length > 0 || filterGameModes.length > 0) && (
+                <div className="mt-3 flex flex-wrap gap-2 items-center">
+                  <span className="text-xs text-muted-foreground">Active filters:</span>
+                  {filterCategories.map((cat) => (
+                    <button
+                      key={cat}
+                      onClick={() => setFilterCategories(filterCategories.filter(c => c !== cat))}
+                      className="px-2 py-1 text-xs rounded-full bg-primary/20 text-primary hover:bg-primary/30 transition-colors"
+                    >
+                      {cat} ×
+                    </button>
+                  ))}
+                  {filterPlatforms.map((plat) => (
+                    <button
+                      key={plat}
+                      onClick={() => setFilterPlatforms(filterPlatforms.filter(p => p !== plat))}
+                      className="px-2 py-1 text-xs rounded-full bg-muted text-foreground hover:bg-muted/80 transition-colors"
+                    >
+                      {plat} ×
+                    </button>
+                  ))}
+                  {filterGameModes.map((mode) => (
+                    <button
+                      key={mode}
+                      onClick={() => setFilterGameModes(filterGameModes.filter(m => m !== mode))}
+                      className="px-2 py-1 text-xs rounded-full bg-green-500/20 text-green-600 hover:bg-green-500/30 transition-colors"
+                    >
+                      {mode} ×
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => {
+                      setFilterCategories([])
+                      setFilterPlatforms([])
+                      setFilterGameModes([])
+                    }}
+                    className="text-xs text-muted-foreground hover:text-foreground underline ml-2"
+                  >
+                    Clear all
+                  </button>
+                </div>
+              )}
+            </div>
+
             {publicTierLists.length === 0 ? (
               <Card>
                 <CardHeader>
@@ -326,7 +463,29 @@ export default function TierListsPage() {
               </Card>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {publicTierLists.map((tierList) => (
+                {publicTierLists
+                  .filter(tierList => {
+                    // Apply local filtering
+                    if (filterCategories.length === 0 && filterPlatforms.length === 0 && filterGameModes.length === 0) {
+                      return true
+                    }
+                    const listCats = (tierList.categories || []).map(c => c.toLowerCase())
+                    const listPlats = (tierList.platforms || []).map(p => p.toLowerCase())
+                    const listModes = (tierList.gameModes || []).map(m => m.toLowerCase())
+
+                    const catMatch = filterCategories.length === 0 || filterCategories.every(f =>
+                      listCats.some(c => c.includes(f.toLowerCase()))
+                    )
+                    const platMatch = filterPlatforms.length === 0 || filterPlatforms.every(f =>
+                      listPlats.some(p => p.includes(f.toLowerCase()))
+                    )
+                    const modeMatch = filterGameModes.length === 0 || filterGameModes.every(f =>
+                      listModes.some(m => m.includes(f.toLowerCase()))
+                    )
+
+                    return catMatch && platMatch && modeMatch
+                  })
+                  .map((tierList) => (
                   <Card key={tierList.id} className="hover:shadow-md transition-shadow">
                     <Link href={`/tier-lists/${tierList.id}`}>
                       <CardHeader className="pb-2">
@@ -344,13 +503,66 @@ export default function TierListsPage() {
                           </CardDescription>
                         )}
                       </CardHeader>
-                      <CardContent>
-                        <div className="flex items-center justify-between text-sm text-muted-foreground">
-                          <span>{tierList.gameCount} games</span>
-                          <span>Updated {formatDate(tierList.updatedAt)}</span>
-                        </div>
-                      </CardContent>
                     </Link>
+                    {/* Clickable category tags */}
+                    {(tierList.categories?.length > 0 || tierList.platforms?.length > 0 || tierList.gameModes?.length > 0) && (
+                      <div className="px-6 pb-2 flex flex-wrap gap-1">
+                        {tierList.categories?.map((cat) => (
+                          <button
+                            key={cat}
+                            onClick={(e) => {
+                              e.preventDefault()
+                              if (!filterCategories.includes(cat)) {
+                                setFilterCategories([...filterCategories, cat])
+                              }
+                            }}
+                            className="px-2 py-0.5 text-xs rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                          >
+                            {cat}
+                          </button>
+                        ))}
+                        {tierList.platforms?.map((plat) => (
+                          <button
+                            key={plat}
+                            onClick={(e) => {
+                              e.preventDefault()
+                              if (!filterPlatforms.includes(plat)) {
+                                setFilterPlatforms([...filterPlatforms, plat])
+                              }
+                            }}
+                            className="px-2 py-0.5 text-xs rounded-full bg-muted text-muted-foreground hover:bg-muted/80 transition-colors"
+                          >
+                            {plat}
+                          </button>
+                        ))}
+                        {tierList.gameModes?.map((mode) => (
+                          <button
+                            key={mode}
+                            onClick={(e) => {
+                              e.preventDefault()
+                              if (!filterGameModes.includes(mode)) {
+                                setFilterGameModes([...filterGameModes, mode])
+                              }
+                            }}
+                            className={`px-2 py-0.5 text-xs rounded-full transition-colors ${
+                              mode.toLowerCase().includes("co-op") || mode.toLowerCase().includes("coop")
+                                ? "bg-green-500/20 text-green-600 hover:bg-green-500/30"
+                                : mode.toLowerCase().includes("multiplayer")
+                                ? "bg-purple-500/20 text-purple-600 hover:bg-purple-500/30"
+                                : "bg-blue-500/20 text-blue-600 hover:bg-blue-500/30"
+                            }`}
+                          >
+                            {mode}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <CardContent>
+                      <div className="flex items-center justify-between text-sm text-muted-foreground">
+                        <span>{tierList.gameCount} games</span>
+                        <span>Updated {formatDate(tierList.updatedAt)}</span>
+                      </div>
+                    </CardContent>
                   </Card>
                 ))}
               </div>
@@ -479,6 +691,37 @@ export default function TierListsPage() {
                       onChange={(e) => setNewListDescription(e.target.value)}
                       placeholder="A description of your tier list..."
                       className="w-full p-2 border rounded-md bg-background min-h-[80px]"
+                      disabled={creating}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="list-categories">Categories/Genres (comma-separated)</Label>
+                    <Input
+                      id="list-categories"
+                      value={newListCategories}
+                      onChange={(e) => setNewListCategories(e.target.value)}
+                      placeholder="RPG, Action, Adventure"
+                      disabled={creating}
+                    />
+                    <p className="text-xs text-muted-foreground">e.g., RPG, Action, Horror, Indie</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="list-platforms">Platforms (comma-separated)</Label>
+                    <Input
+                      id="list-platforms"
+                      value={newListPlatforms}
+                      onChange={(e) => setNewListPlatforms(e.target.value)}
+                      placeholder="PC, PlayStation, Nintendo Switch"
+                      disabled={creating}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="list-gamemodes">Player Modes (comma-separated)</Label>
+                    <Input
+                      id="list-gamemodes"
+                      value={newListGameModes}
+                      onChange={(e) => setNewListGameModes(e.target.value)}
+                      placeholder="Single player, Co-op, Multiplayer"
                       disabled={creating}
                     />
                   </div>

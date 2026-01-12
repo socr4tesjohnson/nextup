@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useSession } from "next-auth/react"
 import Link from "next/link"
-import { useParams, useSearchParams } from "next/navigation"
+import { useParams, useSearchParams, useRouter } from "next/navigation"
 import { Header } from "@/components/layout/header"
 import { Breadcrumb } from "@/components/ui/breadcrumb"
 import { Button } from "@/components/ui/button"
@@ -98,6 +98,7 @@ export default function GameDetailPage() {
   const { data: session } = useSession()
   const params = useParams()
   const searchParams = useSearchParams()
+  const router = useRouter()
   const gameId = params.id as string
 
   // Get group context from URL params for breadcrumb navigation
@@ -131,6 +132,51 @@ export default function GameDetailPage() {
 
   // Video modal state
   const [selectedVideo, setSelectedVideo] = useState<GameVideo | null>(null)
+
+  // Filter state for clickable tags
+  const [activeFilters, setActiveFilters] = useState<{
+    genres: string[]
+    platforms: string[]
+    gameModes: string[]
+  }>({ genres: [], platforms: [], gameModes: [] })
+
+  // Toggle a filter and navigate to search
+  const toggleFilter = (type: 'genres' | 'platforms' | 'gameModes', value: string) => {
+    setActiveFilters(prev => {
+      const current = prev[type]
+      const newValues = current.includes(value)
+        ? current.filter(v => v !== value)
+        : [...current, value]
+
+      const newFilters = { ...prev, [type]: newValues }
+
+      // Build URL params
+      const params = new URLSearchParams()
+      if (newFilters.genres.length > 0) {
+        params.set('genres', newFilters.genres.join(','))
+      }
+      if (newFilters.platforms.length > 0) {
+        params.set('platforms', newFilters.platforms.join(','))
+      }
+      if (newFilters.gameModes.length > 0) {
+        params.set('gameModes', newFilters.gameModes.join(','))
+      }
+
+      // Navigate to search page with filters
+      if (params.toString()) {
+        router.push(`/search?${params.toString()}`)
+      }
+
+      return newFilters
+    })
+  }
+
+  // Navigate to search with a single filter (for initial click)
+  const searchByFilter = (type: 'genres' | 'platforms' | 'gameModes', value: string) => {
+    const params = new URLSearchParams()
+    params.set(type, value)
+    router.push(`/search?${params.toString()}`)
+  }
 
   // Handle Escape key to close modals
   useEffect(() => {
@@ -495,12 +541,14 @@ export default function GameDetailPage() {
                 <h2 className="text-lg font-semibold mb-2">Genres</h2>
                 <div className="flex flex-wrap gap-2">
                   {game.genres.map((genre) => (
-                    <span
+                    <button
                       key={genre}
-                      className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm"
+                      onClick={() => searchByFilter('genres', genre)}
+                      className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm hover:bg-primary/20 hover:scale-105 transition-all cursor-pointer"
+                      title={`Search for ${genre} games`}
                     >
                       {genre}
-                    </span>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -511,12 +559,14 @@ export default function GameDetailPage() {
                 <h2 className="text-lg font-semibold mb-2">Themes</h2>
                 <div className="flex flex-wrap gap-2">
                   {game.themes.map((theme) => (
-                    <span
+                    <button
                       key={theme}
-                      className="px-3 py-1 bg-secondary/50 text-secondary-foreground rounded-full text-sm"
+                      onClick={() => searchByFilter('genres', theme)}
+                      className="px-3 py-1 bg-secondary/50 text-secondary-foreground rounded-full text-sm hover:bg-secondary/70 hover:scale-105 transition-all cursor-pointer"
+                      title={`Search for ${theme} games`}
                     >
                       {theme}
-                    </span>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -526,13 +576,15 @@ export default function GameDetailPage() {
               <div>
                 <h2 className="text-lg font-semibold mb-2">Platforms</h2>
                 <div className="flex flex-wrap gap-2">
-                  {game.platforms.map((platform) => (
-                    <span
-                      key={platform}
-                      className="px-3 py-1 bg-muted text-muted-foreground rounded-full text-sm"
+                  {game.platforms.map((plat) => (
+                    <button
+                      key={plat}
+                      onClick={() => searchByFilter('platforms', plat)}
+                      className="px-3 py-1 bg-muted text-muted-foreground rounded-full text-sm hover:bg-muted/80 hover:text-foreground hover:scale-105 transition-all cursor-pointer"
+                      title={`Search for ${plat} games`}
                     >
-                      {platform}
-                    </span>
+                      {plat}
+                    </button>
                   ))}
                 </div>
               </div>
@@ -546,18 +598,20 @@ export default function GameDetailPage() {
                   {game.gameModes && game.gameModes.length > 0 && (
                     <div className="flex flex-wrap gap-2">
                       {game.gameModes.map((mode) => (
-                        <span
+                        <button
                           key={mode}
-                          className={`px-3 py-1 rounded-full text-sm font-medium ${
+                          onClick={() => searchByFilter('gameModes', mode)}
+                          className={`px-3 py-1 rounded-full text-sm font-medium hover:scale-105 transition-all cursor-pointer ${
                             mode.toLowerCase().includes("single")
-                              ? "bg-blue-500/20 text-blue-600 dark:text-blue-400"
+                              ? "bg-blue-500/20 text-blue-600 dark:text-blue-400 hover:bg-blue-500/30"
                               : mode.toLowerCase().includes("co-op") || mode.toLowerCase().includes("coop")
-                              ? "bg-green-500/20 text-green-600 dark:text-green-400"
-                              : "bg-purple-500/20 text-purple-600 dark:text-purple-400"
+                              ? "bg-green-500/20 text-green-600 dark:text-green-400 hover:bg-green-500/30"
+                              : "bg-purple-500/20 text-purple-600 dark:text-purple-400 hover:bg-purple-500/30"
                           }`}
+                          title={`Search for ${mode} games`}
                         >
                           {mode}
-                        </span>
+                        </button>
                       ))}
                     </div>
                   )}
