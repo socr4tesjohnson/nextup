@@ -26,6 +26,15 @@ interface NotificationPreferences {
   emailNotifications: boolean
 }
 
+interface PrivacyPreferences {
+  showActivityToGroup: boolean
+  showGameStatus: boolean
+  showRatings: boolean
+  showNotes: boolean
+  showOnlineStatus: boolean
+  allowGroupInvites: boolean
+}
+
 const AVAILABLE_PLATFORMS = ["PC", "PlayStation 5", "PlayStation 4", "Xbox Series X|S", "Xbox One", "Nintendo Switch"]
 const AVAILABLE_STORES = ["Steam", "GOG", "Epic Games", "Humble Bundle", "Green Man Gaming", "PlayStation Store", "Xbox Store", "Nintendo eShop"]
 
@@ -34,6 +43,7 @@ const tabs = [
   { id: "account", label: "Account" },
   { id: "deals", label: "Deals" },
   { id: "notifications", label: "Notifications" },
+  { id: "privacy", label: "Privacy" },
 ]
 
 export default function SettingsPage() {
@@ -45,6 +55,14 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [successMessage, setSuccessMessage] = useState("")
   const [errorMessage, setErrorMessage] = useState("")
+
+  // Change password state
+  const [currentPassword, setCurrentPassword] = useState("")
+  const [newPassword, setNewPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [changingPassword, setChangingPassword] = useState(false)
+  const [passwordSuccessMessage, setPasswordSuccessMessage] = useState("")
+  const [passwordErrorMessage, setPasswordErrorMessage] = useState("")
 
   // Delete account state
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
@@ -76,6 +94,19 @@ export default function SettingsPage() {
   const [savingNotifs, setSavingNotifs] = useState(false)
   const [notifSuccessMessage, setNotifSuccessMessage] = useState("")
   const [notifErrorMessage, setNotifErrorMessage] = useState("")
+
+  // Privacy preferences state
+  const [privacyPrefs, setPrivacyPrefs] = useState<PrivacyPreferences>({
+    showActivityToGroup: true,
+    showGameStatus: true,
+    showRatings: true,
+    showNotes: false,
+    showOnlineStatus: true,
+    allowGroupInvites: true,
+  })
+  const [savingPrivacy, setSavingPrivacy] = useState(false)
+  const [privacySuccessMessage, setPrivacySuccessMessage] = useState("")
+  const [privacyErrorMessage, setPrivacyErrorMessage] = useState("")
 
   // Simple tab change handler
   const handleTabChange = (tabId: string) => {
@@ -132,6 +163,22 @@ export default function SettingsPage() {
     fetchNotifPrefs()
   }, [])
 
+  // Fetch privacy preferences
+  useEffect(() => {
+    async function fetchPrivacyPrefs() {
+      try {
+        const response = await fetch("/api/users/me/privacy")
+        if (response.ok) {
+          const data = await response.json()
+          setPrivacyPrefs(data.preferences)
+        }
+      } catch (error) {
+        console.error("Failed to fetch privacy preferences:", error)
+      }
+    }
+    fetchPrivacyPrefs()
+  }, [])
+
   const handleSignOut = () => {
     signOut({ callbackUrl: "/" })
   }
@@ -163,6 +210,68 @@ export default function SettingsPage() {
       setTimeout(() => setErrorMessage(""), 5000)
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleChangePassword = async () => {
+    setPasswordSuccessMessage("")
+    setPasswordErrorMessage("")
+
+    // Validate fields
+    if (!currentPassword) {
+      setPasswordErrorMessage("Current password is required")
+      return
+    }
+
+    if (!newPassword) {
+      setPasswordErrorMessage("New password is required")
+      return
+    }
+
+    if (newPassword.length < 8) {
+      setPasswordErrorMessage("New password must be at least 8 characters long")
+      return
+    }
+
+    const hasLetter = /[a-zA-Z]/.test(newPassword)
+    const hasNumber = /[0-9]/.test(newPassword)
+
+    if (!hasLetter || !hasNumber) {
+      setPasswordErrorMessage("New password must contain at least one letter and one number")
+      return
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordErrorMessage("New passwords do not match")
+      return
+    }
+
+    setChangingPassword(true)
+
+    try {
+      const response = await fetch("/api/users/me/password", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to change password")
+      }
+
+      setPasswordSuccessMessage("Password changed successfully!")
+      setCurrentPassword("")
+      setNewPassword("")
+      setConfirmPassword("")
+      setTimeout(() => setPasswordSuccessMessage(""), 5000)
+    } catch (error) {
+      setPasswordErrorMessage(error instanceof Error ? error.message : "Failed to change password")
+    } finally {
+      setChangingPassword(false)
     }
   }
 
@@ -267,6 +376,35 @@ export default function SettingsPage() {
     }
   }
 
+  const handleSavePrivacyPrefs = async () => {
+    setSavingPrivacy(true)
+    setPrivacySuccessMessage("")
+    setPrivacyErrorMessage("")
+
+    try {
+      const response = await fetch("/api/users/me/privacy", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(privacyPrefs),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || "Failed to save privacy preferences")
+      }
+
+      setPrivacySuccessMessage("Privacy preferences saved!")
+      setTimeout(() => setPrivacySuccessMessage(""), 3000)
+    } catch (error) {
+      setPrivacyErrorMessage(error instanceof Error ? error.message : "Failed to save privacy preferences")
+      setTimeout(() => setPrivacyErrorMessage(""), 5000)
+    } finally {
+      setSavingPrivacy(false)
+    }
+  }
+
   const togglePlatform = (platform: string) => {
     setDealPrefs(prev => ({
       ...prev,
@@ -364,7 +502,64 @@ export default function SettingsPage() {
 
           {/* Account Tab */}
           {activeTab === "account" && (
-            <div id="account-panel" role="tabpanel" aria-labelledby="account-tab">
+            <div id="account-panel" role="tabpanel" aria-labelledby="account-tab" className="space-y-6">
+              {/* Change Password Card */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Change Password</CardTitle>
+                  <CardDescription>Update your password to keep your account secure.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {passwordSuccessMessage && (
+                    <div className="p-3 text-sm text-green-800 bg-green-100 rounded-md">
+                      {passwordSuccessMessage}
+                    </div>
+                  )}
+                  {passwordErrorMessage && (
+                    <div className="p-3 text-sm text-red-800 bg-red-100 rounded-md">
+                      {passwordErrorMessage}
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <Label htmlFor="currentPassword">Current Password</Label>
+                    <Input
+                      id="currentPassword"
+                      type="password"
+                      placeholder="Enter your current password"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="newPassword">New Password</Label>
+                    <Input
+                      id="newPassword"
+                      type="password"
+                      placeholder="Enter new password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Minimum 8 characters, must include at least one letter and one number.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                    <Input
+                      id="confirmPassword"
+                      type="password"
+                      placeholder="Confirm new password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                    />
+                  </div>
+                  <Button onClick={handleChangePassword} disabled={changingPassword}>
+                    {changingPassword ? "Changing Password..." : "Change Password"}
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Account Actions Card */}
               <Card>
                 <CardHeader>
                   <CardTitle>Account</CardTitle>
@@ -591,6 +786,122 @@ export default function SettingsPage() {
 
                   <Button onClick={handleSaveNotifPrefs} disabled={savingNotifs}>
                     {savingNotifs ? "Saving..." : "Save Notification Preferences"}
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Privacy Tab */}
+          {activeTab === "privacy" && (
+            <div id="privacy-panel" role="tabpanel" aria-labelledby="privacy-tab">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Privacy Settings</CardTitle>
+                  <CardDescription>Control what others can see about you.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {privacySuccessMessage && (
+                    <div className="p-3 text-sm text-green-800 bg-green-100 rounded-md">
+                      {privacySuccessMessage}
+                    </div>
+                  )}
+                  {privacyErrorMessage && (
+                    <div className="p-3 text-sm text-red-800 bg-red-100 rounded-md">
+                      {privacyErrorMessage}
+                    </div>
+                  )}
+
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label htmlFor="privacy-activity" className="cursor-pointer">Show Activity to Group</Label>
+                        <p className="text-xs text-muted-foreground">Let group members see what games you're playing</p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        id="privacy-activity"
+                        checked={privacyPrefs.showActivityToGroup}
+                        onChange={(e) => setPrivacyPrefs(prev => ({ ...prev, showActivityToGroup: e.target.checked }))}
+                        className="w-4 h-4 rounded border-gray-300"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label htmlFor="privacy-status" className="cursor-pointer">Show Game Status</Label>
+                        <p className="text-xs text-muted-foreground">Display your game statuses (Now Playing, Finished, etc.)</p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        id="privacy-status"
+                        checked={privacyPrefs.showGameStatus}
+                        onChange={(e) => setPrivacyPrefs(prev => ({ ...prev, showGameStatus: e.target.checked }))}
+                        className="w-4 h-4 rounded border-gray-300"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label htmlFor="privacy-ratings" className="cursor-pointer">Show Ratings</Label>
+                        <p className="text-xs text-muted-foreground">Let others see your game ratings</p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        id="privacy-ratings"
+                        checked={privacyPrefs.showRatings}
+                        onChange={(e) => setPrivacyPrefs(prev => ({ ...prev, showRatings: e.target.checked }))}
+                        className="w-4 h-4 rounded border-gray-300"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label htmlFor="privacy-notes" className="cursor-pointer">Show Notes</Label>
+                        <p className="text-xs text-muted-foreground">Share your personal game notes with group members</p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        id="privacy-notes"
+                        checked={privacyPrefs.showNotes}
+                        onChange={(e) => setPrivacyPrefs(prev => ({ ...prev, showNotes: e.target.checked }))}
+                        className="w-4 h-4 rounded border-gray-300"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label htmlFor="privacy-online" className="cursor-pointer">Show Online Status</Label>
+                        <p className="text-xs text-muted-foreground">Let others see when you were last active</p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        id="privacy-online"
+                        checked={privacyPrefs.showOnlineStatus}
+                        onChange={(e) => setPrivacyPrefs(prev => ({ ...prev, showOnlineStatus: e.target.checked }))}
+                        className="w-4 h-4 rounded border-gray-300"
+                      />
+                    </div>
+
+                    <div className="pt-4 border-t">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <Label htmlFor="privacy-invites" className="cursor-pointer">Allow Group Invites</Label>
+                          <p className="text-xs text-muted-foreground">Let anyone invite you to join groups</p>
+                        </div>
+                        <input
+                          type="checkbox"
+                          id="privacy-invites"
+                          checked={privacyPrefs.allowGroupInvites}
+                          onChange={(e) => setPrivacyPrefs(prev => ({ ...prev, allowGroupInvites: e.target.checked }))}
+                          className="w-4 h-4 rounded border-gray-300"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <Button onClick={handleSavePrivacyPrefs} disabled={savingPrivacy}>
+                    {savingPrivacy ? "Saving..." : "Save Privacy Settings"}
                   </Button>
                 </CardContent>
               </Card>
