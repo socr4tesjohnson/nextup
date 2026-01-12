@@ -1,8 +1,8 @@
 # NextUp Development Progress
 
-## Last Updated: Session 11
+## Last Updated: Session 12
 
-## Current Status: 153/158 features passing (96.8%)
+## Current Status: 155/160 features passing (96.9%)
 
 ## Completed Features
 
@@ -65,9 +65,24 @@ Verified Working:
 - Dashboard loads correctly with user data
 - Settings page with all tabs working
 
+### Session 12: Feature 160 - IsThereAnyDeal API Integration
+
+Implemented:
+- Created full ITAD API client (src/lib/api/itad.ts)
+- Functions: searchGames, getGameInfo, getGamePrices, getDeals, getHistoricalLow
+- Updated deals API route to use real ITAD data
+- Added credentials to .env file
+- OAuth redirect URL for testing: http://localhost:3002/api/auth/callback/itad
+
+Verified:
+- ITAD API successfully returns real deal data (GOG, Humble Store, Steam prices)
+- Historical low prices displayed ($3.99 for Witcher 3)
+- Deal URLs link to ITAD affiliate links (itad.link)
+- Graceful fallback to mock data if ITAD unavailable
+
 Remaining 5 Features (all need external dependencies):
-1. Discord Integration - needs DISCORD_CLIENT_ID/SECRET
-2. Search for Deals - needs deal site APIs
+1. Discord Integration - needs DISCORD_CLIENT_ID/SECRET (configured but needs OAuth verification)
+2. Search for Deals - needs deal site APIs (partially done with ITAD)
 3. Game Trailers - needs YouTube API
 4. Docker Setup - needs Docker daemon running
 5. Google OAuth - needs Google credentials
@@ -80,3 +95,7 @@ Remaining 5 Features (all need external dependencies):
 
 ## Database
 - SQLite: prisma/dev.db
+
+## API Credentials Configured
+- IsThereAnyDeal: ITAD_API_KEY, ITAD_CLIENT_ID, ITAD_OAUTH_SECRET
+- Discord: DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET
