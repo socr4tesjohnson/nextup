@@ -34,6 +34,7 @@ model User {
   notifications           Notification[]
   notificationPreferences UserNotificationPreference?
   privacyPreferences      UserPrivacyPreference?
+  discordConnection       UserDiscordConnection?
 }
 
 model Account {
@@ -95,11 +96,12 @@ model Group {
   updatedAt        DateTime @updatedAt
 
   // Relations
-  owner           User                  @relation("GroupOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  members         GroupMember[]
-  gameEntries     UserGameEntry[]
-  interestProfile GroupInterestProfile?
-  recommendations GroupRecommendation[]
+  owner            User                   @relation("GroupOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members          GroupMember[]
+  gameEntries      UserGameEntry[]
+  interestProfile  GroupInterestProfile?
+  recommendations  GroupRecommendation[]
+  discordSettings  GroupDiscordSettings?
 }
 
 model GroupMember {
@@ -333,4 +335,46 @@ model TierListGame {
 
   @@unique([tierListId, gameId])
   @@index([tierListId])
+}
+
+// ============================================================================
+// Discord Integration
+// ============================================================================
+
+model UserDiscordConnection {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  discordId         String   @unique  // Discord user ID
+  discordUsername   String             // Discord username
+  discordAvatar     String?            // Discord avatar hash
+  accessToken       String?            // Discord OAuth access token
+  refreshToken      String?            // Discord OAuth refresh token
+  tokenExpiresAt    DateTime?          // When the access token expires
+  showDiscordStatus Boolean  @default(true)  // Show Discord online status to group members
+  syncNowPlaying    Boolean  @default(true)  // Auto-update "Now Playing" from Discord activity
+  lastActivitySync  DateTime?          // Last time we synced Discord activity
+  currentGame       String?            // Current game being played on Discord
+  isOnline          Boolean  @default(false)  // Whether user is currently online on Discord
+  lastOnline        DateTime?          // Last time user was online on Discord
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model GroupDiscordSettings {
+  id               String   @id @default(cuid())
+  groupId          String   @unique
+  webhookUrl       String?  // Discord webhook URL for notifications
+  channelId        String?  // Discord channel ID for bot integration
+  serverId         String?  // Discord server (guild) ID
+  enableWebhook    Boolean  @default(false)  // Send notifications to Discord
+  notifyNewGames   Boolean  @default(true)   // Notify when members add new games
+  notifyNowPlaying Boolean  @default(true)   // Notify when members start playing
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relations
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
 }

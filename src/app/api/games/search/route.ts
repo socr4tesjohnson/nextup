@@ -197,15 +197,15 @@ export async function GET(request: NextRequest) {
 
     console.log(`[Cache MISS] Search query: "${query}"`)
 
-    // First, search local database
-    const localGames = await prisma.game.findMany({
-      where: {
-        name: {
-          contains: query,
-        }
-      },
-      take: 20
-    })
+    // First, search local database (case-insensitive for SQLite using LIKE with % wildcards)
+    // SQLite LIKE is case-insensitive for ASCII characters by default
+    const localGames = await prisma.$queryRaw`
+      SELECT id, provider, providerGameId, name, slug, description, coverUrl, bannerUrl,
+             firstReleaseDate, genres, platforms, franchises, themes, gameModes, playerCount, rating
+      FROM Game
+      WHERE LOWER(name) LIKE ${`%${query.toLowerCase()}%`}
+      LIMIT 20
+    ` as any[]
 
     // If we have local results, cache and return them
     if (localGames.length > 0) {

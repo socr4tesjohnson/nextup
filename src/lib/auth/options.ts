@@ -2,6 +2,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter"
 import { NextAuthOptions } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import GoogleProvider from "next-auth/providers/google"
+import DiscordProvider from "next-auth/providers/discord"
 import bcrypt from "bcryptjs"
 import { prisma } from "@/lib/db/prisma"
 
@@ -21,6 +22,16 @@ export const authOptions: NextAuthOptions = {
       clientId: process.env.GOOGLE_CLIENT_ID || "",
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
       allowDangerousEmailAccountLinking: true,
+    }),
+    DiscordProvider({
+      clientId: process.env.DISCORD_CLIENT_ID || "",
+      clientSecret: process.env.DISCORD_CLIENT_SECRET || "",
+      allowDangerousEmailAccountLinking: true,
+      authorization: {
+        params: {
+          scope: "identify email guilds",
+        },
+      },
     }),
     CredentialsProvider({
       name: "credentials",
@@ -66,6 +77,43 @@ export const authOptions: NextAuthOptions = {
       if (trigger === "update" && session?.name) {
         token.name = session.name
       }
+
+      // Save Discord connection data when signing in with Discord
+      if (account?.provider === "discord" && user?.id) {
+        try {
+          await prisma.userDiscordConnection.upsert({
+            where: { userId: user.id },
+            update: {
+              discordId: account.providerAccountId,
+              discordUsername: user.name || "",
+              discordAvatar: (user as any).image || null,
+              accessToken: account.access_token || null,
+              refreshToken: account.refresh_token || null,
+              tokenExpiresAt: account.expires_at
+                ? new Date(account.expires_at * 1000)
+                : null,
+              isOnline: true,
+              lastOnline: new Date(),
+            },
+            create: {
+              userId: user.id,
+              discordId: account.providerAccountId,
+              discordUsername: user.name || "",
+              discordAvatar: (user as any).image || null,
+              accessToken: account.access_token || null,
+              refreshToken: account.refresh_token || null,
+              tokenExpiresAt: account.expires_at
+                ? new Date(account.expires_at * 1000)
+                : null,
+              isOnline: true,
+              lastOnline: new Date(),
+            },
+          })
+        } catch (error) {
+          console.error("Failed to save Discord connection:", error)
+        }
+      }
+
       return token
     },
     async session({ session, token }) {

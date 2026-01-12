@@ -35,12 +35,25 @@ interface PrivacyPreferences {
   allowGroupInvites: boolean
 }
 
+interface DiscordConnection {
+  id: string
+  discordId: string
+  discordUsername: string
+  discordAvatar: string | null
+  showDiscordStatus: boolean
+  syncNowPlaying: boolean
+  currentGame: string | null
+  isOnline: boolean
+  lastOnline: string | null
+}
+
 const AVAILABLE_PLATFORMS = ["PC", "PlayStation 5", "PlayStation 4", "Xbox Series X|S", "Xbox One", "Nintendo Switch"]
 const AVAILABLE_STORES = ["Steam", "GOG", "Epic Games", "Humble Bundle", "Green Man Gaming", "PlayStation Store", "Xbox Store", "Nintendo eShop"]
 
 const tabs = [
   { id: "profile", label: "Profile" },
   { id: "account", label: "Account" },
+  { id: "discord", label: "Discord" },
   { id: "deals", label: "Deals" },
   { id: "notifications", label: "Notifications" },
   { id: "privacy", label: "Privacy" },
@@ -116,6 +129,14 @@ export default function SettingsPage() {
   const [privacySuccessMessage, setPrivacySuccessMessage] = useState("")
   const [privacyErrorMessage, setPrivacyErrorMessage] = useState("")
 
+  // Discord connection state
+  const [discordConnection, setDiscordConnection] = useState<DiscordConnection | null>(null)
+  const [discordLoading, setDiscordLoading] = useState(true)
+  const [savingDiscord, setSavingDiscord] = useState(false)
+  const [discordSuccessMessage, setDiscordSuccessMessage] = useState("")
+  const [discordErrorMessage, setDiscordErrorMessage] = useState("")
+  const [disconnectingDiscord, setDisconnectingDiscord] = useState(false)
+
   // Simple tab change handler
   const handleTabChange = (tabId: string) => {
     setActiveTab(tabId)
@@ -188,6 +209,24 @@ export default function SettingsPage() {
       }
     }
     fetchPrivacyPrefs()
+  }, [])
+
+  // Fetch Discord connection
+  useEffect(() => {
+    async function fetchDiscordConnection() {
+      try {
+        const response = await fetch("/api/settings/discord")
+        if (response.ok) {
+          const data = await response.json()
+          setDiscordConnection(data.connection)
+        }
+      } catch (error) {
+        console.error("Failed to fetch Discord connection:", error)
+      } finally {
+        setDiscordLoading(false)
+      }
+    }
+    fetchDiscordConnection()
   }, [])
 
   const handleSignOut = () => {
@@ -556,6 +595,89 @@ export default function SettingsPage() {
     }))
   }
 
+  const handleConnectDiscord = async () => {
+    try {
+      const response = await fetch("/api/settings/discord/link", {
+        method: "POST",
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || "Failed to get Discord link URL")
+      }
+
+      const data = await response.json()
+      // Redirect to Discord OAuth
+      window.location.href = data.url
+    } catch (error) {
+      setDiscordErrorMessage(error instanceof Error ? error.message : "Failed to connect Discord")
+      setTimeout(() => setDiscordErrorMessage(""), 5000)
+    }
+  }
+
+  const handleSaveDiscordSettings = async () => {
+    if (!discordConnection) return
+
+    setSavingDiscord(true)
+    setDiscordSuccessMessage("")
+    setDiscordErrorMessage("")
+
+    try {
+      const response = await fetch("/api/settings/discord", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          showDiscordStatus: discordConnection.showDiscordStatus,
+          syncNowPlaying: discordConnection.syncNowPlaying,
+        }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || "Failed to save Discord settings")
+      }
+
+      setDiscordSuccessMessage("Discord settings saved!")
+      setTimeout(() => setDiscordSuccessMessage(""), 3000)
+    } catch (error) {
+      setDiscordErrorMessage(error instanceof Error ? error.message : "Failed to save Discord settings")
+      setTimeout(() => setDiscordErrorMessage(""), 5000)
+    } finally {
+      setSavingDiscord(false)
+    }
+  }
+
+  const handleDisconnectDiscord = async () => {
+    if (!confirm("Are you sure you want to disconnect Discord? You can reconnect at any time.")) {
+      return
+    }
+
+    setDisconnectingDiscord(true)
+    setDiscordErrorMessage("")
+
+    try {
+      const response = await fetch("/api/settings/discord", {
+        method: "DELETE",
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || "Failed to disconnect Discord")
+      }
+
+      setDiscordConnection(null)
+      setDiscordSuccessMessage("Discord disconnected successfully")
+      setTimeout(() => setDiscordSuccessMessage(""), 3000)
+    } catch (error) {
+      setDiscordErrorMessage(error instanceof Error ? error.message : "Failed to disconnect Discord")
+      setTimeout(() => setDiscordErrorMessage(""), 5000)
+    } finally {
+      setDisconnectingDiscord(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -796,6 +918,158 @@ export default function SettingsPage() {
                       This action cannot be undone. All your data will be permanently deleted.
                     </p>
                   </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Discord Tab */}
+          {activeTab === "discord" && (
+            <div id="discord-panel" role="tabpanel" aria-labelledby="discord-tab">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Discord Integration</CardTitle>
+                  <CardDescription>
+                    Connect your Discord account to show your online status and current game to group members.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {discordSuccessMessage && (
+                    <div className="p-3 text-sm text-green-800 bg-green-100 rounded-md">
+                      {discordSuccessMessage}
+                    </div>
+                  )}
+                  {discordErrorMessage && (
+                    <div className="p-3 text-sm text-red-800 bg-red-100 rounded-md">
+                      {discordErrorMessage}
+                    </div>
+                  )}
+
+                  {discordLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    </div>
+                  ) : discordConnection ? (
+                    <>
+                      {/* Connected State */}
+                      <div className="flex items-center gap-4 p-4 bg-muted rounded-lg">
+                        <div className="w-12 h-12 rounded-full bg-[#5865F2] flex items-center justify-center overflow-hidden">
+                          {discordConnection.discordAvatar ? (
+                            <img
+                              src={`https://cdn.discordapp.com/avatars/${discordConnection.discordId}/${discordConnection.discordAvatar}.png`}
+                              alt="Discord avatar"
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
+                            </svg>
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-medium">{discordConnection.discordUsername}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {discordConnection.isOnline ? (
+                              <span className="flex items-center gap-1">
+                                <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                                Online
+                                {discordConnection.currentGame && (
+                                  <span className="ml-1">• Playing {discordConnection.currentGame}</span>
+                                )}
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1">
+                                <span className="w-2 h-2 rounded-full bg-gray-400"></span>
+                                Offline
+                                {discordConnection.lastOnline && (
+                                  <span className="ml-1">
+                                    • Last seen {new Date(discordConnection.lastOnline).toLocaleDateString()}
+                                  </span>
+                                )}
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleDisconnectDiscord}
+                          disabled={disconnectingDiscord}
+                        >
+                          {disconnectingDiscord ? "Disconnecting..." : "Disconnect"}
+                        </Button>
+                      </div>
+
+                      {/* Discord Settings */}
+                      <div className="space-y-4 pt-4">
+                        <h4 className="font-medium">Discord Settings</h4>
+
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label htmlFor="discord-status" className="cursor-pointer">Show Online Status</Label>
+                            <p className="text-xs text-muted-foreground">
+                              Let group members see if you're online on Discord
+                            </p>
+                          </div>
+                          <input
+                            type="checkbox"
+                            id="discord-status"
+                            checked={discordConnection.showDiscordStatus}
+                            onChange={(e) => setDiscordConnection(prev => prev ? {
+                              ...prev,
+                              showDiscordStatus: e.target.checked
+                            } : null)}
+                            className="w-4 h-4 rounded border-gray-300"
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label htmlFor="discord-sync" className="cursor-pointer">Sync "Now Playing"</Label>
+                            <p className="text-xs text-muted-foreground">
+                              Automatically update your "Now Playing" based on Discord activity
+                            </p>
+                          </div>
+                          <input
+                            type="checkbox"
+                            id="discord-sync"
+                            checked={discordConnection.syncNowPlaying}
+                            onChange={(e) => setDiscordConnection(prev => prev ? {
+                              ...prev,
+                              syncNowPlaying: e.target.checked
+                            } : null)}
+                            className="w-4 h-4 rounded border-gray-300"
+                          />
+                        </div>
+
+                        <Button onClick={handleSaveDiscordSettings} disabled={savingDiscord}>
+                          {savingDiscord ? "Saving..." : "Save Discord Settings"}
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* Not Connected State */}
+                      <div className="text-center py-8">
+                        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#5865F2] flex items-center justify-center">
+                          <svg className="w-8 h-8 text-white" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
+                          </svg>
+                        </div>
+                        <h4 className="text-lg font-medium mb-2">Connect Your Discord</h4>
+                        <p className="text-muted-foreground mb-4 max-w-sm mx-auto">
+                          Link your Discord account to show your online status and automatically
+                          sync your current game with your NextUp groups.
+                        </p>
+                        <Button onClick={handleConnectDiscord} className="bg-[#5865F2] hover:bg-[#4752C4]">
+                          <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
+                          </svg>
+                          Connect Discord
+                        </Button>
+                      </div>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             </div>
