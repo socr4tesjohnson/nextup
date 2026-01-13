@@ -251,6 +251,57 @@ npm run lint
 npm run test
 ```
 
+## Deployment
+
+### Railway (Recommended for Free Hosting)
+
+1. **Create a Railway account** at [railway.app](https://railway.app)
+
+2. **Create a new project** and add these services:
+   - PostgreSQL database
+   - Redis database
+   - Web service (connect your GitHub repo)
+
+3. **Configure environment variables** in the web service:
+   ```
+   DATABASE_URL=${DATABASE_URL}
+   REDIS_URL=${REDIS_URL}
+   NEXTAUTH_URL=https://your-app.railway.app
+   NEXTAUTH_SECRET=<generate with: openssl rand -base64 32>
+   TWITCH_CLIENT_ID=<your-twitch-client-id>
+   TWITCH_CLIENT_SECRET=<your-twitch-client-secret>
+   ITAD_API_KEY=<your-itad-api-key>
+   GOOGLE_CLIENT_ID=<optional>
+   GOOGLE_CLIENT_SECRET=<optional>
+   ```
+
+4. **Deploy**: Railway will automatically build and deploy on push to main branch
+
+5. **Run migrations**: In Railway dashboard, open the service shell:
+   ```bash
+   npx prisma migrate deploy
+   ```
+
+**Note**: Railway's free tier includes:
+- $5 of usage per month
+- PostgreSQL database
+- Redis database
+- Automatic HTTPS
+- Custom domains
+
+### Docker Production
+
+```bash
+# Build and run full stack
+docker compose --profile full up -d
+
+# View logs
+docker compose logs -f app
+
+# Stop services
+docker compose down
+```
+
 ## License
 
 MIT

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useSession } from "next-auth/react"
 import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
@@ -32,7 +32,7 @@ const STATUS_OPTIONS = [
   { value: "FAVORITE", label: "Favorite" },
 ]
 
-export default function SearchPage() {
+function SearchPageContent() {
   const { data: session } = useSession()
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -607,5 +607,13 @@ export default function SearchPage() {
         )}
       </main>
     </div>
+  )
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <SearchPageContent />
+    </Suspense>
   )
 }

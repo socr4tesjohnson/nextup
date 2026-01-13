@@ -236,7 +236,7 @@ export default function GroupDetailPage() {
         const membersMap = new Map(discordData.members.map((m: any) => [m.id, m]))
         const mergedMembers = groupData.group.members.map((member: GroupMember) => ({
           ...member,
-          discord: membersMap.get(member.user.id)?.discord || null
+          discord: (membersMap.get(member.user.id) as any)?.discord || null
         }))
         setMembersWithDiscord(mergedMembers)
       } else {

@@ -51,3 +51,18 @@ features.db
 .claude_system_prompt.txt
 prompts/
 prisma/dev.db
+
+# Playwright screenshots
+.playwright-mcp/
+
+# Docker volumes
+postgres_data/
+redis_data/
+
+# Backup files
+*.backup
+*.bak
+*.tmp
+*_backup.*
+*_modified.*
+*_final.*
