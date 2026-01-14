@@ -58,10 +58,33 @@ services:
     ports:
       - "3000:3000"
     environment:
+      # Database & Cache
       - DATABASE_URL=postgresql://nextup:nextup_dev_password@postgres:5432/nextup
       - REDIS_URL=redis://redis:6379
-      - NEXTAUTH_URL=http://localhost:3000
+      
+      # NextAuth
+      - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-your-secret-change-in-production}
+      
+      # API Keys - Load from .env file
+      - TWITCH_CLIENT_ID=${TWITCH_CLIENT_ID}
+      - TWITCH_CLIENT_SECRET=${TWITCH_CLIENT_SECRET}
+      - ITAD_API_KEY=${ITAD_API_KEY}
+      - ITAD_CLIENT_ID=${ITAD_CLIENT_ID}
+      - ITAD_OAUTH_SECRET=${ITAD_OAUTH_SECRET}
+      
+      # OAuth (optional)
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID}
+      - DISCORD_CLIENT_SECRET=${DISCORD_CLIENT_SECRET}
+      
+      # SMTP (optional)
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SMTP_FROM=${SMTP_FROM:-noreply@nextup.local}
     depends_on:
       postgres:
         condition: service_healthy
